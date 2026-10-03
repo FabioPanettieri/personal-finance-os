@@ -155,7 +155,7 @@ Due controlli impediscono che i tipi divergano dallo schema:
 migration) e il job CI `supabase-local`, che rigenera i tipi e fallisce se
 `git diff` non è vuoto.
 
-## Uso delle tabelle di import (Sprint 3, nessuna migration)
+## Uso delle tabelle di import (Sprint 3; colonne aggiunte in 0006)
 
 - `imports.bank_profile` = fonte (`ing`, `revolut`, `trade_republic`); stato
   `preview` → `committed` (o `cancelled`).
@@ -168,6 +168,25 @@ migration) e il job CI `supabase-local`, che rigenera i tipi e fallisce se
 - `transactions.fingerprint` / `investment_transactions.fingerprint`: chiave di
   deduplicazione (identificativo della fonte o hash con indice di occorrenza).
 - `instruments` creati per ISIN alla conferma (`unique (user_id, isin)`).
+
+## Migration 0006 — hardening import (Sprint 3 Hardening)
+
+Estensione minima, nessuna nuova tabella (RLS e policy AAL2 esistenti coprono
+le nuove colonne):
+- `accounts.iban` (facoltativo, formato IBAN, unico per utente): riconosce i
+  trasferimenti tra conti propri dall'IBAN della controparte.
+- `categorization_rules`: `match_field` anche `counterparty_iban` e
+  `source_type` (causale/tipo della banca); `sources` (fonti a cui si applica);
+  `set_transfer_account_id` (conto di destinazione, FK composita sullo stesso
+  utente, solo per regole transfer/investment); `review_reason` (regola che
+  chiede revisione esplicita); `version` incrementata dal trigger
+  `bump_rule_version` a ogni modifica della definizione (non dei contatori d'uso;
+  lo storico completo è in `audit_logs`).
+- `import_rows.transfer_account_id`: conto proprio proposto/scelto in anteprima.
+- `seed_import_defaults(user_id)`: conti "ING Conto Risparmio" (savings) e
+  "Carta di credito" (card), senza banca CSV predefinita, e le regole iniziali
+  come dati. Chiamata dal trigger di registrazione e una volta per gli utenti
+  esistenti; idempotente (per nome).
 
 ## Lettura dei movimenti
 

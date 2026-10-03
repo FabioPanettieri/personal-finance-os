@@ -198,3 +198,26 @@ integrazione API 53, E2E mock 24, E2E Supabase reale 19 (1 saltato per scelta).
 
 **Prima dei dati reali**: confermare le intestazioni e la semantica di
 fee/tax/amount con export reali anonimizzati (solo intestazioni + righe inventate).
+
+## SPRINT 3 HARDENING — COMPLETED (validazione su formati reali)
+
+Dettagli: `docs/06-import-real-formats.md`.
+
+**Implemented**
+- Revolut export italiano: `Prodotto = Attuale`, tipi e stati in italiano,
+  data di completamento, riconoscimento formato più forte, Ricarica mai
+  trasferimento automatico, controparte dalla descrizione.
+- ING reale: NUL di riempimento, CRLF, `;`, righe Saldo iniziale/finale mai
+  transazioni, riconciliazione, causale come tipo della banca, controparte e IBAN.
+- Trasferimenti: IBAN dei conti propri, conto di destinazione (anteprima e
+  regole), abbinamento uno-a-uno deterministico, contropartite su conti non
+  alimentati da estratti.
+- Conti "ING Conto Risparmio" e "Carta di credito".
+- Regole di classificazione solo nel database (versionate, RLS/AAL2), incluse
+  le regole personali iniziali; nessuna regola Mangopay.
+- Quantità e prezzi come stringhe decimali fino a Postgres.
+- UI minima: IBAN nel form del conto, "Conto di destinazione" nell'anteprima.
+
+**Database**: migration 0006 (estensione minima, nessuna nuova tabella).
+
+**Non fatto (deciso)**: parser PDF Trade Republic — solo architettura e TODO.

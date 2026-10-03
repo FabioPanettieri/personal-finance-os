@@ -1,0 +1,2 @@
+# Fixture CSV byte per byte (CRLF, NUL di riempimento): nessuna conversione.
+tests/fixtures/csv/**/*.csv -text

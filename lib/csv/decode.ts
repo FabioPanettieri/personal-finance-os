@@ -16,7 +16,24 @@ function startsWith(bytes: Uint8Array, prefix: number[]): boolean {
   return prefix.every((value, index) => bytes[index] === value)
 }
 
-export function decodeBytes(bytes: Uint8Array): DecodedText {
+function isUtf16(bytes: Uint8Array): boolean {
+  return startsWith(bytes, [0xff, 0xfe]) || startsWith(bytes, [0xfe, 0xff])
+}
+
+/**
+ * Riempimento con byte NUL in coda (es. export ING portati a un multiplo di
+ * 4096 byte): non fa parte del contenuto e viene ignorato. Un NUL in mezzo al
+ * testo resta invece un segnale di file binario.
+ */
+export function stripTrailingNul(bytes: Uint8Array): Uint8Array {
+  if (isUtf16(bytes)) return bytes
+  let end = bytes.length
+  while (end > 0 && bytes[end - 1] === 0) end--
+  return end === bytes.length ? bytes : bytes.subarray(0, end)
+}
+
+export function decodeBytes(input: Uint8Array): DecodedText {
+  const bytes = stripTrailingNul(input)
   if (startsWith(bytes, [0xef, 0xbb, 0xbf])) {
     return { text: new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(3)), encoding: 'utf-8', hadBom: true }
   }
@@ -33,9 +50,8 @@ export function decodeBytes(bytes: Uint8Array): DecodedText {
   }
 }
 
-/** Un CSV non contiene byte NUL (tipici di file binari: xlsx, pdf, immagini). */
+/** Un CSV non contiene byte NUL nel testo (tipici di file binari: xlsx, pdf, immagini). */
 export function looksBinary(bytes: Uint8Array): boolean {
-  const sample = bytes.subarray(0, 4096)
-  const isUtf16 = startsWith(sample, [0xff, 0xfe]) || startsWith(sample, [0xfe, 0xff])
-  return !isUtf16 && sample.includes(0)
+  if (isUtf16(bytes)) return false
+  return stripTrailingNul(bytes).subarray(0, 4096).includes(0)
 }

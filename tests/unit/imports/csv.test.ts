@@ -24,7 +24,9 @@ describe('decodifica', () => {
   })
 
   it('riconosce file binari', () => {
-    expect(looksBinary(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]))).toBe(true)
+    expect(looksBinary(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00, 0x08, 0x00]))).toBe(true)
+    // NUL di riempimento solo in coda (export ING): non è un file binario.
+    expect(looksBinary(new Uint8Array([...new TextEncoder().encode('a;b\r\n1;2\r\n'), 0, 0, 0]))).toBe(false)
     expect(looksBinary(new TextEncoder().encode('a,b\n1,2'))).toBe(false)
   })
 })

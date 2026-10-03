@@ -269,14 +269,15 @@ TransactionEditor → Server Action (Zod) → repository.update (RLS)
 
 | Fase | Modulo |
 |---|---|
-| Validazione file (estensione, MIME, ≤ 10 MB, non binario) | `lib/imports/pipeline.ts` → `validateFile` |
+| Validazione file (estensione, MIME, ≤ 10 MB, non binario; NUL di riempimento in coda ignorati) | `lib/imports/pipeline.ts` → `validateFile` |
 | Decodifica (BOM, UTF-8, UTF-16, Windows-1252) | `lib/csv/decode.ts` |
 | Riconoscimento fonte (punteggio per importer) | `lib/imports/importers/index.ts` → `detectSource` |
 | Parsing e delimitatore | `lib/csv/parse.ts` |
 | Mapping colonne (alias IT/EN) | `lib/imports/importers/mapping.ts` |
 | Normalizzazione (`NormalizedTransaction`) | `INGImporter`, `RevolutImporter`, `TradeRepublicImporter` (interfaccia `CsvImporter`) |
 | Duplicati | `lib/imports/fingerprint.ts`, `lib/imports/duplicates.ts` |
-| Classificazione (regole configurabili) | `lib/categorization/engine.ts`, `rules.ts` + `categorization_rules` |
+| Classificazione (regole nel database) | `lib/categorization/engine.ts` + `categorization_rules` |
+| Riconciliazione saldi dichiarati (ING) | `lib/imports/pipeline.ts` → `reconcile` |
 | Trasferimenti | `lib/transfers/detect.ts` |
 | Anteprima, correzioni, conferma | `server/services/imports.ts`, `/imports/[id]` |
 
@@ -289,8 +290,10 @@ Scelte principali:
   diventano movimenti di cassa separati alla conferma (fingerprint derivato),
   così i saldi restano corretti.
 - **Classificazione**: suggerimento strutturale della fonte (es. Revolut
-  `TOPUP`, Trade Republic `BUY`), poi la prima regola applicabile — regole
-  dell'utente nel database prima delle predefinite (dati, non codice). Mai un
+  `CARD_PAYMENT`, Trade Republic `BUY`), poi la prima regola applicabile in
+  ordine di priorità. Tutte le regole sono righe di `categorization_rules`
+  (create dal database alla registrazione, modificabili e versionate): nessuna
+  regola nel codice. Mai un
   tipo incompatibile con il segno. Confidenza < 0,6 o nessun tipo → **Da
   verificare**: la conferma è bloccata finché l'utente non classifica o esclude.
 - **Trade Republic**: `BUY`/`SELL`/PAC vanno in `investment_transactions` (non
@@ -299,6 +302,9 @@ Scelte principali:
   broker resta "liquidità al costo" fino allo Sprint 8 (valore di mercato).
 - **Revolut**: righe REVERTED/DECLINED/PENDING, prodotti diversi dal conto
   corrente e valute diverse dalla valuta del conto vengono escluse con il motivo.
+- **Formati reali** (Sprint 3 Hardening): vedi `docs/06-import-real-formats.md`
+  — export Revolut italiano, ING con CRLF/NUL/righe di saldo, trasferimenti tra
+  conti propri via IBAN, contropartite su conti non alimentati da estratti.
 - **Conferma idempotente**: ogni inserimento usa `upsert … ignoreDuplicates` su
   `(account_id, fingerprint)`; un nuovo tentativo dopo un errore non duplica nulla.
 
@@ -328,10 +334,9 @@ Soglie: ≥ 0.90 applicata automaticamente (`is_categorized = true`);
 
 ## 10. Rischi e decisioni aperte
 
-- **Formati CSV reali**: le intestazioni di ING, Revolut e Trade Republic
-  vanno verificate su export reali anonimizzati (solo intestazioni + 2 righe
-  inventate) prima dello Sprint 3. Gli adapter avranno mapping configurabile,
-  quindi un cambio di formato non richiede un deploy.
+- **Formati CSV reali**: ING e Revolut verificati su export reali (Sprint 3
+  Hardening, `docs/06-import-real-formats.md`); Trade Republic solo in PDF nel
+  campione reale → `TradeRepublicPdfImporter` da progettare.
 - **ING** esporta spesso XLS/XLSX oltre al CSV: supporto Excel valutato allo Sprint 3.
 - **Valore Trade Republic**: nessuna API prezzi in v1; il valore si aggiorna da
   valutazione manuale o dall'export TR se contiene il controvalore.

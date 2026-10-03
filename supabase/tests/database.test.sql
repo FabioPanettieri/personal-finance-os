@@ -94,12 +94,12 @@ values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', :'b_ing', '2026-09-30', 'Stipend
 -- -----------------------------------------------------------------------------
 
 select tests.ok((select count(*) from public.profiles where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') = 1, 'bootstrap: profilo creato');
-select tests.ok((select count(*) from public.accounts where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') = 3, 'bootstrap: 3 conti (ING, Revolut, Trade Republic)');
+select tests.ok((select count(*) from public.accounts where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') = 5, 'bootstrap: 5 conti (ING, ING Conto Risparmio, Revolut, Carta di credito, Trade Republic)');
 select tests.ok((select count(*) from public.investment_accounts where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') = 1, 'bootstrap: Trade Republic registrato come conto investimento');
 select tests.ok((select count(*) from public.businesses where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') = 3, 'bootstrap: 3 business');
 select tests.ok((select count(*) from public.income_sources where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') = 4, 'bootstrap: 4 fonti di reddito');
 select tests.ok((select count(*) from public.transaction_categories where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and parent_id is null) = 17, 'bootstrap: 17 macro-categorie');
-select tests.ok((select count(*) from public.categorization_rules where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') = 3, 'bootstrap: 3 regole di sistema');
+select tests.ok((select count(*) from public.categorization_rules where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') = 36, 'bootstrap: 36 regole di sistema (3 di base + 33 iniziali per l''import)');
 select tests.ok(
   (select count(*) from public.income_sources s join public.businesses b on b.id = s.business_id
    where s.user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') = 2,
@@ -121,12 +121,75 @@ select id as a_salary from public.income_sources where name = 'Stipendio' \gset
 
 -- Lettura -------------------------------------------------------------------
 
-select tests.ok((select count(*) from public.accounts) = 3, 'RLS: A vede solo i propri 3 conti');
+select tests.ok((select count(*) from public.accounts) = 5, 'RLS: A vede solo i propri 5 conti');
 select tests.ok((select count(*) from public.transactions) = 0, 'RLS: A non vede le transazioni di B');
 select tests.ok((select count(*) from public.transaction_categories where user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') = 0, 'RLS: A non vede le categorie di B');
 select tests.ok((select count(*) from public.profiles) = 1, 'RLS: A vede solo il proprio profilo');
-select tests.ok((select count(*) from public.account_balances) = 3, 'RLS: la vista account_balances rispetta la RLS');
+select tests.ok((select count(*) from public.account_balances) = 5, 'RLS: la vista account_balances rispetta la RLS');
 select tests.ok((select count(*) from public.account_types) = 7, 'account_types leggibile da utenti autenticati');
+
+-- Hardening import su formati reali (0006) ------------------------------------
+
+select id as a_sav from public.accounts where name = 'ING Conto Risparmio' \gset
+select id as a_card from public.accounts where name = 'Carta di credito' \gset
+select tests.ok(
+  (select account_type = 'savings' and default_bank_profile is null from public.accounts where id = :'a_sav'),
+  '0006: ING Conto Risparmio è un conto deposito senza banca CSV predefinita');
+select tests.ok(
+  (select account_type = 'card' and default_bank_profile is null from public.accounts where id = :'a_card'),
+  '0006: Carta di credito è un conto separato di tipo carta');
+
+update public.accounts set iban = 'IT00R0000000000000000000003' where id = :'a_rev';
+select tests.ok((select iban from public.accounts where id = :'a_rev') = 'IT00R0000000000000000000003', '0006: IBAN salvabile sul conto');
+select tests.throws(
+  format($$update public.accounts set iban = 'non un iban' where id = %L$$, :'a_sav'),
+  '23514', '0006: IBAN in formato non valido rifiutato');
+select tests.throws(
+  format($$update public.accounts set iban = 'IT00R0000000000000000000003' where id = %L$$, :'a_sav'),
+  '23505', '0006: lo stesso IBAN non può stare su due conti dell''utente');
+
+select tests.ok(
+  (select set_transfer_account_id = :'a_card' and match_field = 'source_type' and sources = '{ing}'
+   from public.categorization_rules where name like 'ING: addebito carta di credito%'),
+  '0006: regola causale "Addebito Carta Di Credito" → conto Carta di credito');
+select tests.ok(
+  (select count(*) from public.categorization_rules where name like 'Etsy%' or name like 'Stripe%' or name like 'Google Ireland%'
+     or name like 'Packlink%' or name like 'Elegoo%' or name like 'Aruba%' or name like 'GoDaddy%') = 7,
+  '0006: 7 regole personali iniziali (Etsy, Stripe, Google Ireland, Packlink, Elegoo, Aruba, GoDaddy)');
+select tests.ok(
+  (select count(*) from public.categorization_rules where pattern ilike '%mangopay%') = 0,
+  '0006: nessuna regola automatica per Mangopay');
+select tests.ok(
+  (select count(*) from public.categorization_rules where set_business_id is not null and name like 'Etsy%') = 1,
+  '0006: regola Etsy collegata al business VOXEL Studio');
+select tests.ok(
+  (select count(*) from public.categorization_rules where review_reason is not null and set_type is null) = 2,
+  '0006: regole di sola revisione (bonifico ricevuto, prelievo) senza tipo');
+
+update public.categorization_rules set pattern = 'etsy' where name like 'Etsy%';
+select tests.ok((select version from public.categorization_rules where name like 'Etsy%') = 2, '0006: modificare una regola ne incrementa la versione');
+update public.categorization_rules set hit_count = hit_count + 1, last_matched_at = now() where name like 'Etsy%';
+select tests.ok((select version from public.categorization_rules where name like 'Etsy%') = 2, '0006: i contatori d''uso non cambiano la versione');
+update public.categorization_rules set version = 99 where name like 'Etsy%';
+select tests.ok((select version from public.categorization_rules where name like 'Etsy%') = 2, '0006: la versione non è impostabile dal client');
+
+insert into public.categorization_rules (name, match_field, pattern, set_type, set_nature)
+values ('Test IBAN', 'counterparty_iban', 'IT00C0000000000000000000005', 'income', 'personal');
+select tests.ok((select count(*) from public.categorization_rules where name = 'Test IBAN') = 1, '0006: regola su IBAN della controparte accettata');
+select tests.throws(
+  $$insert into public.categorization_rules (name, match_field, pattern, set_type) values ('x', 'importo', 'x', 'expense')$$,
+  '23514', '0006: campo di confronto sconosciuto rifiutato');
+select tests.throws(
+  format($$insert into public.categorization_rules (name, pattern, set_type, set_nature, set_transfer_account_id) values ('x', 'x', 'expense', 'personal', %L)$$, :'a_card'),
+  '23514', '0006: conto di destinazione solo su regole di trasferimento');
+select tests.throws(
+  format($$insert into public.categorization_rules (name, pattern, set_type, set_nature, set_transfer_account_id) values ('x', 'x', 'transfer', 'transfer', %L)$$, :'b_ing'),
+  '23503', '0006: una regola non può puntare al conto di un altro utente');
+select tests.throws(
+  $$insert into public.categorization_rules (name, pattern) values ('vuota', 'x')$$,
+  '23514', '0006: una regola senza alcuna azione è rifiutata');
+delete from public.categorization_rules where name = 'Test IBAN';
+update public.accounts set iban = null where id = :'a_rev';
 
 -- Scrittura propria ---------------------------------------------------------
 
@@ -374,7 +437,7 @@ select tests.throws($$insert into public.goals (name, target_amount_cents) value
 
 select tests.login('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'aal2');
 
-select tests.ok((select count(*) from public.accounts) = 3, 'AAL2: SELECT accounts consentito, nessun conto alterato');
+select tests.ok((select count(*) from public.accounts) = 5, 'AAL2: SELECT accounts consentito, nessun conto alterato');
 select tests.ok((select count(*) from public.transactions) = 4, 'AAL2: SELECT transactions consentito, nessuna riga persa');
 select tests.ok((select count(*) from public.profiles) = 1, 'AAL2: SELECT profilo consentito');
 select tests.ok(
@@ -429,7 +492,7 @@ select tests.ok((select count(*) from attempted) = 0, 'import: B non può modifi
 
 -- Account (Sprint 2) ------------------------------------------------------------
 
-select tests.ok((select count(*) from public.accounts) = 3, 'account: B vede solo i propri 3 conti');
+select tests.ok((select count(*) from public.accounts) = 5, 'account: B vede solo i propri 5 conti');
 select tests.ok(
   (select count(*) from public.accounts where id in (:'a_ing', :'a_rev', :'a_tr')) = 0,
   'account: B non legge i conti di A neppure conoscendone l''id');
@@ -437,8 +500,8 @@ select tests.ok(
   (select count(*) from public.account_balances where account_id = :'a_ing') = 0,
   'account: B non vede il saldo dei conti di A (vista security_invoker)');
 select tests.ok(
-  (select count(*) from public.account_balances) = 3,
-  'account: la vista saldi di B contiene solo i suoi 3 conti');
+  (select count(*) from public.account_balances) = 5,
+  'account: la vista saldi di B contiene solo i suoi 5 conti');
 
 with attempted as (
   update public.accounts set name = 'Preso da B', is_active = false, initial_balance_cents = 999999
@@ -476,11 +539,11 @@ select tests.ok(
   'account: il conto Revolut di A esiste ancora');
 select tests.ok(
   (select array_agg(name order by sort_order) from public.accounts where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
-    = array['ING Direct', 'Revolut', 'Trade Republic'],
-  'bootstrap: ING Direct, Revolut e Trade Republic appartengono all''utente creato');
+    = array['ING Direct', 'ING Conto Risparmio', 'Revolut', 'Carta di credito', 'Trade Republic'],
+  'bootstrap: i 5 conti di default appartengono all''utente creato');
 select tests.ok(
-  (select count(distinct user_id) = 2 and count(*) = 6 from public.accounts),
-  'bootstrap: ogni utente ha i propri conti distinti (3 + 3)');
+  (select count(distinct user_id) = 2 and count(*) = 10 from public.accounts),
+  'bootstrap: ogni utente ha i propri conti distinti (5 + 5)');
 select tests.ok(
   (select a.account_type = 'broker' from public.accounts a where a.id = :'a_tr')
     and (select count(*) from public.investment_accounts where account_id = :'a_tr') = 1,

@@ -1,5 +1,7 @@
 import type { Lookups } from '@/lib/categorization/engine'
-import { DEFAULT_RULES, type Rule } from '@/lib/categorization/rules'
+import type { Rule } from '@/lib/categorization/rules'
+import type { OwnAccount } from '@/lib/imports/pipeline'
+import type { ImportSource } from '@/lib/imports/types'
 import { isIsoDate, type IsoDate } from '@/lib/dates'
 import type { ExistingTransaction } from '@/lib/imports/duplicates'
 import type { Counterpart } from '@/lib/transfers/detect'
@@ -35,9 +37,11 @@ export type ClassificationData = {
   incomeSources: (NamedOption & { businessId: string | null })[]
 }
 
+const MATCH_FIELDS: readonly Rule['matchField'][] = ['description', 'counterparty', 'counterparty_iban', 'source_type']
+
 export async function loadClassificationData(db: DbClient): Promise<ClassificationData> {
   const [rules, categories, businesses, sources] = await Promise.all([
-    db.from('categorization_rules').select('*').eq('is_active', true),
+    db.from('categorization_rules').select('*').eq('is_active', true).order('priority').order('name'),
     db.from('transaction_categories').select('id, name, parent_id, kind, sort_order').eq('is_active', true).order('sort_order').order('name'),
     db.from('businesses').select('id, name, slug').eq('is_active', true).order('sort_order'),
     db.from('income_sources').select('id, name, business_id').eq('is_active', true).order('sort_order'),
@@ -60,23 +64,27 @@ export async function loadClassificationData(db: DbClient): Promise<Classificati
     dbId: r.id,
     name: r.name,
     priority: r.priority,
-    matchField: r.match_field === 'counterparty' ? 'counterparty' : 'description',
+    matchField: MATCH_FIELDS.includes(r.match_field as Rule['matchField']) ? (r.match_field as Rule['matchField']) : 'description',
     matchType: r.match_type,
     pattern: r.pattern,
     accountId: r.account_id,
     direction: r.direction === 'in' || r.direction === 'out' ? r.direction : 'any',
     amountMinCents: r.amount_min_cents,
     amountMaxCents: r.amount_max_cents,
+    sources: r.sources ? r.sources.filter((x): x is ImportSource => x !== 'generic') : null,
     setType: r.set_type,
     setNature: r.set_nature,
     setCategoryId: r.set_category_id,
     setBusinessId: r.set_business_id,
     setIncomeSourceId: r.set_income_source_id,
+    setTransferAccountId: r.set_transfer_account_id,
+    review: r.review_reason,
     confidence: Number(r.confidence),
   }))
 
   return {
-    rules: [...dbRules, ...DEFAULT_RULES],
+    // Solo regole del database: nessuna regola personale o generica nel codice.
+    rules: dbRules,
     lookups: {
       categoryIdByPath: new Map(categoryOptions.map((c) => [c.label, c.id])),
       businessIdBySlug: new Map(businesses.data.map((b) => [b.slug, b.id])),
@@ -175,6 +183,25 @@ export async function findTransferCounterparts(
     if (data.length < PAGE) break
   }
   return result
+}
+
+/** Conti dell'utente con IBAN e banca predefinita (trasferimenti tra conti propri). */
+export async function loadOwnAccounts(db: DbClient): Promise<OwnAccount[]> {
+  const [accounts, profiles] = await Promise.all([
+    listAccounts(db),
+    db.from('accounts').select('id, default_bank_profile'),
+  ])
+  if (profiles.error) fail('Lettura conti', profiles.error)
+  const byId = new Map(profiles.data.map((a) => [a.id, a]))
+  return accounts
+    .filter((a) => a.isActive)
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      kind: a.type.kind,
+      iban: a.iban,
+      importable: Boolean(byId.get(a.id)?.default_bank_profile),
+    }))
 }
 
 export { chunks, fail as failRepository }

@@ -83,7 +83,7 @@ describe('AAL1: password senza TOTP → nessun accesso ai dati', () => {
     expect(balances.data).toEqual([])
     // Controprova con l'amministratore: i dati ci sono.
     const { count } = await admin.from('accounts').select('id', { count: 'exact', head: true }).eq('user_id', a.id)
-    expect(count).toBe(3)
+    expect(count).toBe(5)
   })
 
   it('INSERT → negato', async () => {
@@ -136,7 +136,7 @@ describe('AAL1: password senza TOTP → nessun accesso ai dati', () => {
   it('la verifica TOTP della sessione (AAL1 → AAL2) sblocca l’accesso', async () => {
     await verifyTotp(a, aal1)
     expect(await currentAal(aal1)).toBe('aal2')
-    expect(await listAccounts(aal1)).toHaveLength(3)
+    expect(await listAccounts(aal1)).toHaveLength(5)
   })
 })
 
@@ -148,11 +148,11 @@ describe('Bootstrap del secondo fattore con sessione AAL1', () => {
       expect(await listAccounts(fresh.client)).toEqual([])
       // I conti iniziali sono stati creati dal trigger di signup, nonostante le policy AAL2.
       const { count } = await admin.from('accounts').select('id', { count: 'exact', head: true }).eq('user_id', fresh.id)
-      expect(count).toBe(3)
+      expect(count).toBe(5)
 
       await enrollTotp(fresh)
       expect(await currentAal(fresh.client)).toBe('aal2')
-      expect((await listAccounts(fresh.client)).map((x) => x.name)).toEqual(['ING Direct', 'Revolut', 'Trade Republic'])
+      expect((await listAccounts(fresh.client)).map((x) => x.name)).toEqual(['ING Direct', 'ING Conto Risparmio', 'Revolut', 'Carta di credito', 'Trade Republic'])
     } finally {
       await deleteTestUser(fresh)
     }
@@ -199,7 +199,7 @@ describe('AAL2: password + TOTP → CRUD consentito sui propri dati', () => {
     const { error } = await a.client.auth.refreshSession()
     expect(error).toBeNull()
     expect(await currentAal(a.client)).toBe('aal2')
-    expect(await listAccounts(a.client)).toHaveLength(3)
+    expect(await listAccounts(a.client)).toHaveLength(5)
   })
 })
 

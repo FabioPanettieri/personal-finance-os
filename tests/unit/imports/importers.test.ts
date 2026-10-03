@@ -110,7 +110,8 @@ describe('RevolutImporter', () => {
   it('significato strutturale di top-up, rimborsi, commissioni e cambi', () => {
     const rows = normalized('revolut', fixture('revolut/completo.csv'))
     const hint = (d: string) => rows.find((r) => r.description === d)!.hint
-    expect(hint('Top-up by *0000')).toMatchObject({ type: 'transfer' })
+    // Una ricarica non è mai un trasferimento automatico: può essere un incasso da terzi.
+    expect(hint('Top-up by *0000')).toMatchObject({ type: null, confidence: 0 })
     expect(hint('Amazon refund')).toMatchObject({ type: 'refund' })
     expect(hint('Premium plan fee')).toMatchObject({ type: 'expense' })
     expect(hint('Exchanged to USD')).toMatchObject({ type: 'transfer' })

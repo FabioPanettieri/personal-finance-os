@@ -42,10 +42,10 @@ afterAll(async () => {
 })
 
 describe('bootstrap e lettura', () => {
-  it('l’utente creato riceve ING Direct, Revolut e Trade Republic, di sua proprietà', async () => {
+  it('l’utente creato riceve i 5 conti di default, di sua proprietà', async () => {
     const accounts = await listAccounts(a.client)
-    expect(accounts.map((x) => x.name)).toEqual(['ING Direct', 'Revolut', 'Trade Republic'])
-    expect(accounts.map((x) => x.type.code)).toEqual(['checking', 'checking', 'broker'])
+    expect(accounts.map((x) => x.name)).toEqual(['ING Direct', 'ING Conto Risparmio', 'Revolut', 'Carta di credito', 'Trade Republic'])
+    expect(accounts.map((x) => x.type.code)).toEqual(['checking', 'savings', 'checking', 'card', 'broker'])
     expect(accounts.every((x) => x.currency === 'EUR' && x.isActive && x.balance === 0 && x.transactionCount === 0)).toBe(true)
 
     const { data } = await a.client.from('accounts').select('user_id')
@@ -61,7 +61,7 @@ describe('bootstrap e lettura', () => {
 describe('RLS sull’API reale', () => {
   it('B vede solo i propri conti', async () => {
     const accounts = await listAccounts(b.client)
-    expect(accounts).toHaveLength(3)
+    expect(accounts).toHaveLength(5)
     expect(accounts.map((x) => x.id)).not.toContain(aIng)
   })
 

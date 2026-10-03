@@ -46,6 +46,7 @@ export async function updateRowAction(importId: string, rowId: string, _prev: Im
     categoryId: formData.get('categoryId') ?? '',
     businessId: formData.get('businessId') ?? '',
     incomeSourceId: formData.get('incomeSourceId') ?? '',
+    transferAccountId: formData.get('transferAccountId') ?? '',
   })
   if (!parsed.success) return { status: 'error', fieldErrors: fieldErrorsFrom(parsed.error) }
 

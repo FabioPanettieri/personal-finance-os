@@ -17,6 +17,7 @@ export const rowPatchSchema = z.object({
   categoryId: optionalUuid,
   businessId: optionalUuid,
   incomeSourceId: optionalUuid,
+  transferAccountId: optionalUuid,
 })
 
 export const idSchema = z.uuid()

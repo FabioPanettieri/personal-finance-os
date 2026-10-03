@@ -61,10 +61,11 @@ export function parseAmount(raw: string, preferredDecimal: ',' | '.' = ','): Val
 
   const cents2 = (fraction + '00').slice(0, 2)
   const rest = fraction.slice(2)
+  // Stringa di sole cifre → intero (centesimi): nessuna aritmetica in virgola mobile.
   let value = Number((integerPart || '0') + cents2)
   let warning: string | undefined
   if (/[1-9]/.test(rest)) {
-    if (Number(rest[0]) >= 5) value += 1
+    if (rest[0]! >= '5') value += 1
     warning = `Importo arrotondato al centesimo: "${raw}"`
   }
   if (!Number.isSafeInteger(value)) return { ok: false, error: `Importo fuori intervallo: "${raw}"` }
@@ -78,6 +79,12 @@ export function parseDecimalString(raw: string): ValueResult<string> | null {
   if (text === '') return null
   if (!/^-?\d+(?:[.,]\d+)?$/.test(text)) return { ok: false, error: `Numero non valido: "${raw}"` }
   return { ok: true, value: text.replace(',', '.') }
+}
+
+/** Stringa decimale > 0, o null. Confronto sulle cifre, senza conversione in float. */
+export function positiveDecimal(value: string | null): string | null {
+  if (value === null || !/^\d+(?:\.\d+)?$/.test(value)) return null
+  return /[1-9]/.test(value) ? value : null
 }
 
 export type DateFormat = 'DD/MM/YYYY' | 'YYYY-MM-DD' | 'DD.MM.YYYY' | 'DD-MM-YYYY'

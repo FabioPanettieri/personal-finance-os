@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { Lookups } from '@/lib/categorization/engine'
-import { DEFAULT_RULES } from '@/lib/categorization/rules'
+import { SEED_RULES } from './seed-rules'
 import { analyzeCsv, buildPreview, fingerprintRows, type PreviewContext } from '@/lib/imports/pipeline'
 import type { ImportSource, NormalizedTransaction } from '@/lib/imports/types'
 
@@ -22,7 +22,8 @@ const CATEGORY_PATHS = [
   'Casa > Mutuo', 'Casa > Bollette', 'Alimentazione > Spesa', 'Alimentazione > Ristorante', 'Alimentazione > Bar',
   'Alimentazione > Delivery', 'Trasporti > Carburante', 'Trasporti > Trasporto pubblico', 'Trasporti > Parcheggio',
   'Shopping > Acquisti online', 'Tecnologia > Servizi digitali', 'Trasferimenti > Giroconto',
-  'Investimenti > Versamenti', 'Investimenti > PAC',
+  'Investimenti > Versamenti', 'Investimenti > PAC', 'Trasporti > Auto',
+  'Business > Spedizioni', 'Business > Materiali', 'Business > Software',
 ]
 export const LOOKUPS: Lookups = {
   categoryIdByPath: new Map(CATEGORY_PATHS.map((p) => [p, `cat:${p}`])),
@@ -60,7 +61,7 @@ export async function preview(
   return buildPreview(rows, {
     accountId,
     accountKind: source === 'trade_republic' ? 'investment' : 'liquid',
-    rules: DEFAULT_RULES,
+    rules: SEED_RULES,
     lookups: LOOKUPS,
     existingCash: [],
     existingTradeFingerprints: new Set(),

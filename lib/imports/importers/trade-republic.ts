@@ -4,6 +4,10 @@ import type { CsvImporter, InvestmentDetails, RowOutcome, SecondaryMovement, Str
 import { cell, detectionScore, resolveMapping, type FieldSpec } from './mapping'
 import { abs, baseTransaction, invalid, skipped } from './shared'
 
+// TODO(TradeRepublicPdfImporter): l'estratto conto reale di Trade Republic è
+// un PDF. Parser non implementato per scelta: architettura e prerequisiti in
+// docs/06-import-real-formats.md (estrazione posizionale in JS puro, segno dal
+// saldo, riconciliazione obbligatoria). Questo importer gestisce solo il CSV.
 /**
  * Trade Republic (export transazioni). Distingue:
  * - movimenti di liquidità (category CASH): versamenti, prelievi, dividendi,

@@ -24,10 +24,12 @@ test('elenco: conti bootstrap con saldo, istituto, valuta, tipo e attività', as
 
   await expect(page.getByRole('heading', { name: 'Conti', level: 1 })).toBeVisible()
   const list = page.getByRole('list', { name: 'Conti attivi' })
-  await expect(list.getByRole('listitem')).toHaveCount(3)
+  await expect(list.getByRole('listitem')).toHaveCount(5)
   for (const [name, detail] of [
     ['ING Direct', 'ING · EUR'],
+    ['ING Conto Risparmio', 'ING · EUR'],
     ['Revolut', 'Revolut · EUR'],
+    ['Carta di credito', 'ING · EUR'],
     ['Trade Republic', 'Trade Republic · EUR'],
   ] as const) {
     const row = list.getByRole('listitem').filter({ hasText: name })
@@ -135,7 +137,7 @@ test('modifica, validazione, disattivazione e riattivazione', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Riattiva conto' })).toBeVisible()
   await page.goto('/accounts')
   await expect(page.getByRole('list', { name: 'Conti disattivati' })).toContainText('Revolut Personale')
-  await expect(page.getByRole('list', { name: 'Conti attivi' }).getByRole('listitem')).toHaveCount(2)
+  await expect(page.getByRole('list', { name: 'Conti attivi' }).getByRole('listitem')).toHaveCount(4)
 
   await page.getByRole('list', { name: 'Conti disattivati' }).getByRole('link').click()
   await page.getByRole('button', { name: 'Riattiva conto' }).click()
@@ -152,7 +154,7 @@ test('isolamento: un altro utente non può aprire i conti altrui', async ({ page
   const ownerIng = await accountIdFor(owner.id, 'ING Direct')
 
   await signInWithMfa(page, intruder, '/accounts')
-  await expect(page.getByRole('list', { name: 'Conti attivi' }).getByRole('listitem')).toHaveCount(3)
+  await expect(page.getByRole('list', { name: 'Conti attivi' }).getByRole('listitem')).toHaveCount(5)
   await page.goto(`/accounts/${ownerIng}`)
   await expect(page.getByRole('heading', { name: 'Conto non trovato' })).toBeVisible()
 })

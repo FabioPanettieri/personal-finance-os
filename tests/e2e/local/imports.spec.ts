@@ -110,3 +110,30 @@ test('Trade Republic: acquisto ETF come operazione su titoli, versamento come ca
   const { data: cash } = await admin.from('transactions').select('type, amount_cents').eq('user_id', user.id)
   expect(cash).toEqual([{ type: 'transfer', amount_cents: 20000 }])
 })
+
+test('ING formato reale: NUL in coda, saldi informativi, trasferimenti verso conti propri', async ({ page }) => {
+  const user = await createUser('ing-real')
+  users.push(user)
+  // IBAN fittizi del conto deposito e di Revolut, come lo inserirebbe l'utente dal form del conto.
+  await admin.from('accounts').update({ iban: 'IT00A0000000000000000000002' }).eq('user_id', user.id).eq('name', 'ING Conto Risparmio')
+  await admin.from('accounts').update({ iban: 'IT00R0000000000000000000003' }).eq('user_id', user.id).eq('name', 'Revolut')
+  await signInWithMfa(page, user, '/imports/new')
+
+  await page.getByLabel('File CSV').setInputFiles(fixture('ing/formato-reale.csv'))
+  await page.getByRole('button', { name: /Analizza e mostra l’anteprima/ }).click()
+  await expect(page).toHaveURL(/\/imports\/[0-9a-f-]{36}$/)
+
+  const summary = page.getByRole('region', { name: 'Riepilogo' })
+  await expect(summary).toContainText('Trovate14')
+  await expect(summary).toContainText('Da verificare0')
+  await expect(page.getByText(/Riconciliazione riuscita/)).toBeVisible()
+  await expect(page.getByRole('listitem').filter({ hasText: 'Addebito conto carta di credito' })).toContainText('→ Carta di credito')
+  await expect(page.getByRole('listitem').filter({ hasText: 'Addebito conto carta di credito' })).toContainText('Trasferimento')
+
+  await page.getByRole('button', { name: 'Conferma importazione' }).click()
+  await expect(summary).toContainText('Importate12')
+
+  const { data: card } = await admin.from('accounts').select('id').eq('user_id', user.id).eq('name', 'Carta di credito').single()
+  const { data: cardTx } = await admin.from('transactions').select('amount_cents, type').eq('account_id', card!.id)
+  expect(cardTx).toEqual([{ amount_cents: 40000, type: 'transfer' }])
+})

@@ -36,6 +36,7 @@ export type Database = {
           created_at: string
           currency: string
           default_bank_profile: Database['public']['Enums']['bank_profile'] | null
+          iban: string | null
           icon: string | null
           id: string
           initial_balance_cents: number
@@ -53,6 +54,7 @@ export type Database = {
           created_at?: string
           currency?: string
           default_bank_profile?: Database['public']['Enums']['bank_profile'] | null
+          iban?: string | null
           icon?: string | null
           id?: string
           initial_balance_cents?: number
@@ -70,6 +72,7 @@ export type Database = {
           created_at?: string
           currency?: string
           default_bank_profile?: Database['public']['Enums']['bank_profile'] | null
+          iban?: string | null
           icon?: string | null
           id?: string
           initial_balance_cents?: number
@@ -262,13 +265,17 @@ export type Database = {
           origin: Database['public']['Enums']['rule_origin']
           pattern: string
           priority: number
+          review_reason: string | null
           set_business_id: string | null
           set_category_id: string | null
           set_income_source_id: string | null
           set_nature: Database['public']['Enums']['transaction_nature'] | null
+          set_transfer_account_id: string | null
           set_type: Database['public']['Enums']['transaction_type'] | null
+          sources: Database['public']['Enums']['bank_profile'][] | null
           updated_at: string
           user_id: string
+          version: number
         }
         Insert: {
           account_id?: string | null
@@ -287,13 +294,17 @@ export type Database = {
           origin?: Database['public']['Enums']['rule_origin']
           pattern: string
           priority?: number
+          review_reason?: string | null
           set_business_id?: string | null
           set_category_id?: string | null
           set_income_source_id?: string | null
           set_nature?: Database['public']['Enums']['transaction_nature'] | null
+          set_transfer_account_id?: string | null
           set_type?: Database['public']['Enums']['transaction_type'] | null
+          sources?: Database['public']['Enums']['bank_profile'][] | null
           updated_at?: string
           user_id?: string
+          version?: number
         }
         Update: {
           account_id?: string | null
@@ -312,13 +323,17 @@ export type Database = {
           origin?: Database['public']['Enums']['rule_origin']
           pattern?: string
           priority?: number
+          review_reason?: string | null
           set_business_id?: string | null
           set_category_id?: string | null
           set_income_source_id?: string | null
           set_nature?: Database['public']['Enums']['transaction_nature'] | null
+          set_transfer_account_id?: string | null
           set_type?: Database['public']['Enums']['transaction_type'] | null
+          sources?: Database['public']['Enums']['bank_profile'][] | null
           updated_at?: string
           user_id?: string
+          version?: number
         }
         Relationships: [
           {
@@ -354,6 +369,20 @@ export type Database = {
             columns: ['set_income_source_id', 'user_id']
             isOneToOne: false
             referencedRelation: 'income_sources'
+            referencedColumns: ['id', 'user_id']
+          },
+          {
+            foreignKeyName: 'categorization_rules_set_transfer_account_id_user_id_fkey'
+            columns: ['set_transfer_account_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'account_balances'
+            referencedColumns: ['account_id', 'user_id']
+          },
+          {
+            foreignKeyName: 'categorization_rules_set_transfer_account_id_user_id_fkey'
+            columns: ['set_transfer_account_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'accounts'
             referencedColumns: ['id', 'user_id']
           },
         ]
@@ -581,6 +610,7 @@ export type Database = {
           row_index: number
           status: Database['public']['Enums']['import_row_status']
           transaction_id: string | null
+          transfer_account_id: string | null
           transfer_candidate_id: string | null
           updated_at: string
           user_id: string
@@ -610,6 +640,7 @@ export type Database = {
           row_index: number
           status?: Database['public']['Enums']['import_row_status']
           transaction_id?: string | null
+          transfer_account_id?: string | null
           transfer_candidate_id?: string | null
           updated_at?: string
           user_id?: string
@@ -639,6 +670,7 @@ export type Database = {
           row_index?: number
           status?: Database['public']['Enums']['import_row_status']
           transaction_id?: string | null
+          transfer_account_id?: string | null
           transfer_candidate_id?: string | null
           updated_at?: string
           user_id?: string
@@ -692,6 +724,20 @@ export type Database = {
             columns: ['transaction_id', 'user_id']
             isOneToOne: false
             referencedRelation: 'transactions'
+            referencedColumns: ['id', 'user_id']
+          },
+          {
+            foreignKeyName: 'import_rows_transfer_account_id_user_id_fkey'
+            columns: ['transfer_account_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'account_balances'
+            referencedColumns: ['account_id', 'user_id']
+          },
+          {
+            foreignKeyName: 'import_rows_transfer_account_id_user_id_fkey'
+            columns: ['transfer_account_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'accounts'
             referencedColumns: ['id', 'user_id']
           },
           {
@@ -1536,7 +1582,9 @@ export type Database = {
       }
     }
     Functions: {
+      category_id_by_path: { Args: { p_path: string; p_user_id: string }; Returns: string }
       seed_default_data: { Args: { p_user_id: string }; Returns: undefined }
+      seed_import_defaults: { Args: { p_user_id: string }; Returns: undefined }
     }
     Enums: {
       audit_action: 'insert' | 'update' | 'delete'

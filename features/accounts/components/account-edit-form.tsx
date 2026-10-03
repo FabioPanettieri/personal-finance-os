@@ -13,6 +13,7 @@ import { ACCOUNT_COLORS } from '../schemas'
 export type AccountEditValues = {
   name: string
   institution: string
+  iban: string
   color: string | null
   initialBalance: string
   initialBalanceOn: string
@@ -28,6 +29,7 @@ export function AccountEditForm({ accountId, values }: { accountId: string; valu
   const current = state.values ?? {
     name: values.name,
     institution: values.institution,
+    iban: values.iban,
     color: values.color ?? '',
     initialBalance: values.initialBalance,
     initialBalanceOn: values.initialBalanceOn,
@@ -43,6 +45,16 @@ export function AccountEditForm({ accountId, values }: { accountId: string; valu
           defaultValue={current.institution}
           maxLength={80}
           error={errors?.institution}
+        />
+        <Field
+          label="IBAN (facoltativo)"
+          name="iban"
+          defaultValue={current.iban}
+          maxLength={42}
+          autoComplete="off"
+          spellCheck={false}
+          hint="Serve a riconoscere i trasferimenti tra i tuoi conti negli estratti."
+          error={errors?.iban}
         />
         <Field
           label={`Saldo iniziale (${values.currency})`}

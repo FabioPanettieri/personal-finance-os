@@ -1,6 +1,7 @@
 import { addDays, DEFAULT_TIME_ZONE, isIsoDate, type IsoDate } from '@/lib/dates'
 import { AUTO_APPLY_CONFIDENCE, deriveNature, REVIEW_BELOW_CONFIDENCE, signAllows } from '@/lib/categorization/engine'
-import { secondaryFingerprint } from '@/lib/imports/fingerprint'
+import { mirrorFingerprint, secondaryFingerprint } from '@/lib/imports/fingerprint'
+import { positiveDecimal } from '@/lib/csv/values'
 import { IMPORTERS } from '@/lib/imports/importers'
 import {
   analyzeCsv,
@@ -22,6 +23,7 @@ import {
   findExistingTradeFingerprints,
   findTransferCounterparts,
   loadClassificationData,
+  loadOwnAccounts,
 } from '../repositories/import-context'
 
 /**
@@ -75,6 +77,7 @@ function rowInsert(importId: string, row: PreviewRow): TablesInsert<'import_rows
     categorization_confidence: c ? round3(c.confidence) : null,
     categorization_rule_id: c?.ruleDbId ?? null,
     transfer_candidate_id: row.transferCandidateId,
+    transfer_account_id: row.transferAccountId,
     fingerprint: row.fingerprint,
     status: row.status,
     duplicate_of_transaction_id: row.duplicateOfId,
@@ -114,16 +117,19 @@ export async function createImportPreview(db: DbClient, input: CreatePreviewInpu
   const cashFps = valid.filter((r) => r.kind === 'ok' && r.transaction.movement === 'cash').map((r) => r.fingerprint!)
   const tradeFps = valid.filter((r) => r.kind === 'ok' && r.transaction.movement === 'trade').map((r) => r.fingerprint!)
 
-  const [classification, existingCash, existingTrade, counterparts] = await Promise.all([
+  const [classification, existingCash, existingTrade, counterparts, ownAccounts] = await Promise.all([
     loadClassificationData(db),
     findExistingCash(db, account.id, cashFps, period && { from: addDays(period.from, -2), to: addDays(period.to, 2) }),
     findExistingTradeFingerprints(db, account.id, tradeFps),
     period ? findTransferCounterparts(db, account.id, { from: addDays(period.from, -3), to: addDays(period.to, 3) }) : Promise.resolve([]),
+    loadOwnAccounts(db),
   ])
 
   const preview = buildPreview(fingerprinted, {
     accountId: account.id,
     accountKind: account.type.kind,
+    ownAccounts,
+    reconciliation: analysis.analysis.reconciliation,
     rules: classification.rules,
     lookups: classification.lookups,
     existingCash,
@@ -152,6 +158,7 @@ export async function createImportPreview(db: DbClient, input: CreatePreviewInpu
     rows_duplicate: summary.duplicates,
     rows_possible_duplicate: summary.possibleDuplicates,
     rows_invalid: summary.invalid,
+    error_message: analysis.analysis.reconciliation && !analysis.analysis.reconciliation.ok ? analysis.analysis.reconciliation.message.slice(0, 1000) : null,
     income_cents: Math.max(0, summary.incomeCents),
     expense_cents: Math.max(0, summary.expenseCents),
     transfer_cents: Math.max(0, summary.transferCents),
@@ -193,11 +200,13 @@ export type RowPatch = {
   categoryId: string | null
   businessId: string | null
   incomeSourceId: string | null
+  /** Conto proprio dall'altra parte del trasferimento (solo transfer/investment). */
+  transferAccountId?: string | null
 }
 
 /** Correzione manuale di una riga in anteprima. */
 export async function updateImportRow(db: DbClient, rowId: string, patch: RowPatch): Promise<ServiceResult<null>> {
-  const { data: row, error } = await db.from('import_rows').select('*, imports!inner(status)').eq('id', rowId).maybeSingle()
+  const { data: row, error } = await db.from('import_rows').select('*, imports!inner(status, account_id)').eq('id', rowId).maybeSingle()
   if (error) fail('Lettura riga', error)
   if (!row) return { ok: false, errors: ['Riga non trovata'] }
   if ((row.imports as unknown as { status: string }).status !== 'preview') return { ok: false, errors: ['L’importazione non è più modificabile'] }
@@ -209,6 +218,21 @@ export async function updateImportRow(db: DbClient, rowId: string, patch: RowPat
       ok: false,
       errors: [patch.type === 'expense' ? 'Una spesa deve avere importo negativo' : 'Entrate e rimborsi devono avere importo positivo'],
     }
+  }
+
+  const imp = row.imports as unknown as { status: string; account_id: string }
+  const isTransfer = patch.type === 'transfer' || patch.type === 'investment'
+  const transferAccountId = isTransfer ? (patch.transferAccountId ?? null) : null
+  if (transferAccountId === imp.account_id) return { ok: false, errors: ['Il conto di destinazione deve essere diverso dal conto importato'] }
+  if (transferAccountId) {
+    const { data: target } = await db.from('accounts').select('id').eq('id', transferAccountId).maybeSingle()
+    if (!target) return { ok: false, errors: ['Conto di destinazione non trovato'] }
+  }
+  // La controparte proposta resta valida solo se sta sul conto scelto.
+  let transferCandidateId = isTransfer ? row.transfer_candidate_id : null
+  if (transferCandidateId && transferAccountId) {
+    const { data: candidate } = await db.from('transactions').select('account_id').eq('id', transferCandidateId).maybeSingle()
+    if (candidate?.account_id !== transferAccountId) transferCandidateId = null
   }
 
   let businessId = patch.businessId
@@ -228,6 +252,8 @@ export async function updateImportRow(db: DbClient, rowId: string, patch: RowPat
       categorization_method: 'manual',
       categorization_confidence: 1,
       categorization_rule_id: null,
+      transfer_account_id: transferAccountId,
+      transfer_candidate_id: transferCandidateId,
     })
     .eq('id', rowId)
   if (updateError) fail('Aggiornamento riga', updateError)
@@ -361,6 +387,38 @@ export async function commitImport(db: DbClient, importId: string, timeZone = DE
     groupByRow.set(p.row.id, group.id)
   }
 
+  // Trasferimenti verso conti propri non alimentati da estratti (conto deposito,
+  // carta di credito): la contropartita si registra qui, nello stesso gruppo,
+  // così il denaro non "sparisce" e il patrimonio resta corretto.
+  const ownAccounts = await loadOwnAccounts(db)
+  const ownById = new Map(ownAccounts.map((a) => [a.id, a]))
+  const linkableIds = new Set(linkable.map((p) => p.row.id))
+  const mirrored = planned.filter((p) => {
+    const target = p.row.transfer_account_id ? ownById.get(p.row.transfer_account_id) : undefined
+    return (
+      target &&
+      !target.importable &&
+      target.id !== account.id &&
+      p.tx.movement === 'cash' &&
+      (p.row.proposed_type === 'transfer' || p.row.proposed_type === 'investment') &&
+      !linkableIds.has(p.row.id) &&
+      !existing.has(p.row.fingerprint!)
+    )
+  })
+  for (const p of mirrored) {
+    const { data: group, error: e } = await db
+      .from('transfer_groups')
+      .insert({
+        kind: p.row.proposed_type === 'investment' ? 'investment' : 'internal',
+        detected_by: p.row.categorization_method === 'manual' ? 'manual' : 'auto',
+        confidence: Number(p.row.categorization_confidence ?? 0),
+      })
+      .select('id')
+      .single()
+    if (e) fail('Creazione trasferimento', e)
+    groupByRow.set(p.row.id, group.id)
+  }
+
   // Movimenti di liquidità: riga principale (se cash) + commissioni/imposte.
   const cashInserts: TablesInsert<'transactions'>[] = []
   for (const { row, tx } of planned) {
@@ -413,6 +471,30 @@ export async function commitImport(db: DbClient, importId: string, timeZone = DE
     }
   }
 
+  for (const { row, tx } of mirrored) {
+    const target = ownById.get(row.transfer_account_id!)!
+    const type = row.proposed_type!
+    cashInserts.push({
+      account_id: target.id,
+      booked_on: tx.bookedOn,
+      value_on: tx.valueOn,
+      description: `${tx.amount < 0 ? 'Da' : 'Verso'} ${account.name} · ${tx.description}`.slice(0, 500),
+      original_description: tx.originalDescription.slice(0, 1000),
+      amount_cents: -tx.amount,
+      currency: tx.currency,
+      type,
+      nature: type === 'investment' ? 'investment' : 'transfer',
+      category_id: row.proposed_category_id,
+      transfer_group_id: groupByRow.get(row.id) ?? null,
+      is_categorized: true,
+      categorization_method: row.categorization_method === 'manual' ? 'manual' : 'rule',
+      categorization_confidence: row.categorization_method === 'manual' ? 1 : Number(row.categorization_confidence ?? 0),
+      source: 'csv_import',
+      import_id: importId,
+      fingerprint: await mirrorFingerprint(row.fingerprint!),
+    })
+  }
+
   const insertedByFp = new Map<string, string>(existing)
   for (const part of chunks(cashInserts, 500)) {
     const { data, error: e } = await db
@@ -433,8 +515,9 @@ export async function commitImport(db: DbClient, importId: string, timeZone = DE
       instrument_id: inv.isin ? (instrumentIds.get(inv.isin) ?? null) : null,
       trade_on: tx.bookedOn,
       kind: inv.kind,
-      quantity: inv.quantity !== null && Number(inv.quantity) > 0 ? Number(inv.quantity) : null,
-      price: inv.price !== null ? Number(inv.price) : null,
+      // numeric come stringa decimale: PostgREST la passa a Postgres senza conversione in float.
+      quantity: positiveDecimal(inv.quantity) as unknown as number | null,
+      price: inv.price as unknown as number | null,
       price_currency: inv.price !== null ? tx.currency : null,
       amount_cents: tx.amount,
       fees_cents: tx.fee,

@@ -58,7 +58,7 @@ export type NormalizedTransaction = {
   originalCurrency: string | null
   /** Identificativo stabile fornito dalla fonte (es. transaction_id di Trade Republic). */
   externalId: string | null
-  /** Tipo grezzo della fonte (es. CARD_PAYMENT, CUSTOMER_INBOUND). */
+  /** Tipo grezzo della fonte (es. CARD_PAYMENT, causale ING "Giroconto"), così come scritto nel file. */
   sourceType: string | null
   counterparty: string | null
   counterpartyIban: string | null
@@ -77,9 +77,12 @@ export type NormalizedTransaction = {
   raw: Record<string, string>
 }
 
+/** Riga informativa con un saldo dichiarato dalla banca (mai un movimento). */
+export type BalanceMarker = { kind: 'opening' | 'closing'; date: IsoDate; amount: Cents }
+
 export type RowOutcome =
   | { kind: 'ok'; transaction: NormalizedTransaction }
-  | { kind: 'skipped'; rowIndex: number; reason: string; raw: Record<string, string> }
+  | { kind: 'skipped'; rowIndex: number; reason: string; raw: Record<string, string>; balance?: BalanceMarker }
   | { kind: 'invalid'; rowIndex: number; errors: string[]; raw: Record<string, string> }
 
 export type ColumnMapping = Record<string, string>

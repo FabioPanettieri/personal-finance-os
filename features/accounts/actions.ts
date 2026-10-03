@@ -12,7 +12,7 @@ import { accountIdSchema, accountUpdateSchema } from './schemas'
 export type AccountFormState = FormState & {
   savedAt?: number
   /** Valori inviati, restituiti in caso d'errore: React 19 azzera il form dopo l'action. */
-  values?: Record<'name' | 'institution' | 'color' | 'initialBalance' | 'initialBalanceOn', string>
+  values?: Record<'name' | 'institution' | 'iban' | 'color' | 'initialBalance' | 'initialBalanceOn', string>
 }
 
 function submittedValues(formData: FormData): NonNullable<AccountFormState['values']> {
@@ -23,6 +23,7 @@ function submittedValues(formData: FormData): NonNullable<AccountFormState['valu
   return {
     name: text('name'),
     institution: text('institution'),
+    iban: text('iban'),
     color: text('color'),
     initialBalance: text('initialBalance'),
     initialBalanceOn: text('initialBalanceOn'),
@@ -49,9 +50,9 @@ export async function updateAccountAction(
 
   const result = await updateAccount(await createSupabaseServerClient(), accountId, parsed.data)
   if (!result.ok) {
-    return result.reason === 'duplicate_name'
-      ? { status: 'error', fieldErrors: { name: 'Esiste già un conto con questo nome' }, values }
-      : { status: 'error', message: 'Conto non trovato.', values }
+    if (result.reason === 'duplicate_name') return { status: 'error', fieldErrors: { name: 'Esiste già un conto con questo nome' }, values }
+    if (result.reason === 'duplicate_iban') return { status: 'error', fieldErrors: { iban: 'IBAN già associato a un altro conto' }, values }
+    return { status: 'error', message: 'Conto non trovato.', values }
   }
 
   revalidateAccount(accountId)

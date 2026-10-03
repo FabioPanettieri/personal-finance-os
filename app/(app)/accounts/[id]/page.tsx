@@ -160,6 +160,7 @@ export default async function AccountDetailPage({ params }: Params) {
               color: account.color,
               initialBalance: formatAmountInput(account.initialBalance),
               initialBalanceOn: account.initialBalanceOn ?? '',
+              iban: account.iban ?? '',
               currency: account.currency,
             }}
           />

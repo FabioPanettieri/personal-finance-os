@@ -16,3 +16,7 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /tests/e2e/screenshots/
+# Estratti conto reali: mai nel repository.
+*.real.csv
+*.real.pdf
+/.real-bank-statements/

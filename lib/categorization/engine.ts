@@ -20,6 +20,8 @@ export type Classification = {
   categoryId: string | null
   businessId: string | null
   incomeSourceId: string | null
+  /** Conto proprio di destinazione/provenienza del trasferimento, se noto. */
+  transferAccountId: string | null
   confidence: number
   method: 'rule' | 'none'
   /** Regola del database applicata (le predefinite non hanno id DB). */
@@ -31,7 +33,10 @@ export type Classification = {
 export type ClassifyInput = Pick<
   NormalizedTransaction,
   'source' | 'description' | 'counterparty' | 'amount' | 'hint' | 'movement'
-> & { accountId: string }
+> &
+  Partial<Pick<NormalizedTransaction, 'sourceType' | 'counterpartyIban'>> & { accountId: string }
+
+const compactIban = (text: string) => text.replace(/\s+/g, '').toUpperCase()
 
 export function signAllows(type: TransactionType, amount: number): boolean {
   if (type === 'income' || type === 'refund') return amount > 0
@@ -50,7 +55,9 @@ export function deriveNature(
   return businessId ? 'business' : 'personal'
 }
 
-function ruleMatches(rule: Rule, input: ClassifyInput, text: { description: string; counterparty: string }): boolean {
+type MatchText = { description: string; counterparty: string; counterparty_iban: string; source_type: string }
+
+function ruleMatches(rule: Rule, input: ClassifyInput, text: MatchText): boolean {
   if (rule.accountId && rule.accountId !== input.accountId) return false
   if (rule.sources && !rule.sources.includes(input.source as ImportSource)) return false
   if (rule.direction === 'in' && input.amount <= 0) return false
@@ -59,15 +66,16 @@ function ruleMatches(rule: Rule, input: ClassifyInput, text: { description: stri
   if (rule.amountMinCents !== null && absolute < rule.amountMinCents) return false
   if (rule.amountMaxCents !== null && absolute > rule.amountMaxCents) return false
 
-  const haystack = rule.matchField === 'counterparty' ? text.counterparty : text.description
+  const haystack = text[rule.matchField]
   if (!haystack) return false
+  const needle = rule.matchField === 'counterparty_iban' ? compactIban(rule.pattern) : normalizeDescription(rule.pattern)
   switch (rule.matchType) {
     case 'contains':
-      return haystack.includes(normalizeDescription(rule.pattern))
+      return haystack.includes(needle)
     case 'equals':
-      return haystack === normalizeDescription(rule.pattern)
+      return haystack === needle
     case 'starts_with':
-      return haystack.startsWith(normalizeDescription(rule.pattern))
+      return haystack.startsWith(needle)
     case 'regex':
       try {
         return new RegExp(rule.pattern, 'i').test(haystack)
@@ -90,6 +98,7 @@ export function classify(input: ClassifyInput, rules: readonly Rule[], lookups: 
     categoryId: null,
     businessId: null,
     incomeSourceId: null,
+    transferAccountId: null,
     confidence: 0,
     method: 'none',
     ruleDbId: null,
@@ -111,8 +120,16 @@ export function classify(input: ClassifyInput, rules: readonly Rule[], lookups: 
 
   // Le operazioni su strumenti sono decise dalla struttura del file, non da parole chiave.
   if (input.movement !== 'trade') {
-    const text = { description: normalizeDescription(input.description), counterparty: normalizeDescription(input.counterparty ?? '') }
-    const ordered = [...rules].sort((a, b) => (a.dbId === null ? 1 : 0) - (b.dbId === null ? 1 : 0) || a.priority - b.priority)
+    const text: MatchText = {
+      description: normalizeDescription(input.description),
+      counterparty: normalizeDescription(input.counterparty ?? ''),
+      counterparty_iban: compactIban(input.counterpartyIban ?? ''),
+      source_type: normalizeDescription(input.sourceType ?? ''),
+    }
+    // Ordine deterministico: priorità, poi nome, poi id.
+    const ordered = [...rules].sort(
+      (a, b) => a.priority - b.priority || a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+    )
     for (const rule of ordered) {
       if (!ruleMatches(rule, input, text)) continue
       if (rule.review) {
@@ -131,6 +148,9 @@ export function classify(input: ClassifyInput, rules: readonly Rule[], lookups: 
       const incomeSourceId =
         rule.setIncomeSourceId ?? (rule.setIncomeSourceName ? lookups.incomeSourceIdByName.get(rule.setIncomeSourceName) : undefined)
       if (incomeSourceId) result.incomeSourceId = incomeSourceId
+      if (rule.setTransferAccountId && rule.setTransferAccountId !== input.accountId) {
+        result.transferAccountId = rule.setTransferAccountId
+      }
       result.confidence = Math.max(result.confidence, rule.confidence)
       result.method = 'rule'
       if (rule.dbId) result.ruleDbId = rule.dbId
@@ -148,9 +168,20 @@ export function classify(input: ClassifyInput, rules: readonly Rule[], lookups: 
 /** Coerenza finale: natura, fonte di reddito solo su entrate, categorie dei trasferimenti. */
 export function finalizeClassification(result: Classification, amount: number, lookups: Lookups): Classification {
   if (!result.type) {
-    return { ...result, nature: null, categoryId: null, businessId: null, incomeSourceId: null, confidence: 0, method: 'none', needsReview: true }
+    return {
+      ...result,
+      nature: null,
+      categoryId: null,
+      businessId: null,
+      incomeSourceId: null,
+      transferAccountId: null,
+      confidence: 0,
+      method: 'none',
+      needsReview: true,
+    }
   }
   if (result.type !== 'income') result.incomeSourceId = null
+  if (result.type !== 'transfer' && result.type !== 'investment') result.transferAccountId = null
   if (result.incomeSourceId && !result.businessId) {
     result.businessId = lookups.businessIdByIncomeSourceId.get(result.incomeSourceId) ?? null
   }

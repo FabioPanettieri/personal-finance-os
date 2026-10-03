@@ -44,3 +44,8 @@ export async function fingerprintFor(
 export function secondaryFingerprint(mainFingerprint: string, part: 'fee' | 'tax'): Promise<string> {
   return sha256Hex(`${mainFingerprint}|${part}`)
 }
+
+/** Contropartita di un trasferimento verso un conto non alimentato da estratti (es. Carta di credito). */
+export function mirrorFingerprint(mainFingerprint: string): Promise<string> {
+  return sha256Hex(`${mainFingerprint}|mirror`)
+}

@@ -34,6 +34,8 @@ export type Account = {
   id: string
   name: string
   institution: string | null
+  /** IBAN del conto (facoltativo): riconosce i trasferimenti tra conti propri. */
+  iban: string | null
   type: AccountType
   currency: string
   color: string | null
@@ -48,12 +50,13 @@ export type Account = {
 }
 
 const ACCOUNT_COLUMNS =
-  'id, name, institution, currency, color, is_active, sort_order, initial_balance_cents, initial_balance_on, account_types!inner(code, label, is_liquid, is_investment)'
+  'id, name, institution, iban, currency, color, is_active, sort_order, initial_balance_cents, initial_balance_on, account_types!inner(code, label, is_liquid, is_investment)'
 
 type AccountRow = {
   id: string
   name: string
   institution: string | null
+  iban: string | null
   currency: string
   color: string | null
   is_active: boolean
@@ -74,6 +77,7 @@ function toAccount(row: AccountRow, balance: BalanceRow | undefined): Account {
     id: row.id,
     name: row.name,
     institution: row.institution,
+    iban: row.iban,
     type: { code: row.account_types.code, label: row.account_types.label, kind: accountKind(row.account_types) },
     currency: row.currency,
     color: row.color,
@@ -146,12 +150,13 @@ export async function listAccountMovements(
 export type AccountUpdate = {
   name: string
   institution: string | null
+  iban?: string | null
   color: string | null
   initialBalance: Cents
   initialBalanceOn: IsoDate | null
 }
 
-export type UpdateResult = { ok: true } | { ok: false; reason: 'not_found' | 'duplicate_name' }
+export type UpdateResult = { ok: true } | { ok: false; reason: 'not_found' | 'duplicate_name' | 'duplicate_iban' }
 
 /** Aggiorna solo i campi modificabili; RLS garantisce che il conto sia dell'utente. */
 export async function updateAccount(db: DbClient, id: string, update: AccountUpdate): Promise<UpdateResult> {
@@ -160,6 +165,7 @@ export async function updateAccount(db: DbClient, id: string, update: AccountUpd
     .update({
       name: update.name,
       institution: update.institution,
+      ...(update.iban !== undefined ? { iban: update.iban } : {}),
       color: update.color,
       initial_balance_cents: update.initialBalance,
       initial_balance_on: update.initialBalanceOn,
@@ -167,7 +173,7 @@ export async function updateAccount(db: DbClient, id: string, update: AccountUpd
     .eq('id', id)
     .select('id')
   if (error) {
-    if (error.code === '23505') return { ok: false, reason: 'duplicate_name' }
+    if (error.code === '23505') return { ok: false, reason: error.message.includes('iban') ? 'duplicate_iban' : 'duplicate_name' }
     fail('Aggiornamento conto', error)
   }
   // 0 righe = conto inesistente o di un altro utente (RLS): stessa risposta, nessuna informazione trapela.

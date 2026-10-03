@@ -17,6 +17,9 @@ export type EditableRow = {
   categoryId: string | null
   businessId: string | null
   incomeSourceId: string | null
+  transferAccountId: string | null
+  /** Conto importato: non può essere anche la destinazione. */
+  accountId: string
   canEdit: boolean
   canInclude: boolean
   canExclude: boolean
@@ -61,6 +64,7 @@ export function RowActions({ row }: { row: EditableRow }) {
             <input type="hidden" name="categoryId" value={row.categoryId ?? ''} />
             <input type="hidden" name="businessId" value={row.businessId ?? ''} />
             <input type="hidden" name="incomeSourceId" value={row.incomeSourceId ?? ''} />
+            <input type="hidden" name="transferAccountId" value={row.transferAccountId ?? ''} />
             <Button type="submit" variant="secondary" size="sm" loading={pending} className="min-h-11 sm:min-h-8">
               Conferma proposta
             </Button>
@@ -124,6 +128,24 @@ export function RowActions({ row }: { row: EditableRow }) {
                   {s.label}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-fg sm:col-span-2">
+            Conto di destinazione
+            <select
+              name="transferAccountId"
+              defaultValue={row.transferAccountId ?? ''}
+              className={selectClass}
+              disabled={type !== 'transfer' && type !== 'investment'}
+            >
+              <option value="">Non indicato</option>
+              {options.accounts
+                .filter((a) => a.id !== row.accountId)
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.label}
+                  </option>
+                ))}
             </select>
           </label>
           <div className="flex items-center gap-3 sm:col-span-2">

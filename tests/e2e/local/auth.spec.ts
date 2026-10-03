@@ -30,7 +30,7 @@ test('login → TOTP obbligatorio → dati; persistenza; logout; nuovo login con
   // Bootstrap del secondo fattore con sessione AAL1, poi accesso ai conti (AAL2).
   await context.clearCookies()
   await signInWithMfa(page, user, '/accounts')
-  await expect(page.getByRole('list', { name: 'Conti attivi' }).getByRole('listitem')).toHaveCount(3)
+  await expect(page.getByRole('list', { name: 'Conti attivi' }).getByRole('listitem')).toHaveCount(5)
 
   // Persistenza della sessione.
   await page.reload()
@@ -51,5 +51,5 @@ test('login → TOTP obbligatorio → dati; persistenza; logout; nuovo login con
   await expect(page).toHaveURL(/\/mfa\/verify/)
   await submitTotp(page, user.totpSecret!, 'Verifica')
   await expect(page).toHaveURL('/accounts')
-  await expect(page.getByRole('list', { name: 'Conti attivi' }).getByRole('listitem')).toHaveCount(3)
+  await expect(page.getByRole('list', { name: 'Conti attivi' }).getByRole('listitem')).toHaveCount(5)
 })

@@ -27,6 +27,12 @@ const optionalText = (max: number) =>
 export const accountUpdateSchema = z.object({
   name: z.string().trim().min(1, { error: 'Il nome è obbligatorio' }).max(60, { error: 'Massimo 60 caratteri' }),
   institution: optionalText(80),
+  // IBAN facoltativo, accettato con spazi e minuscole; salvato in forma compatta.
+  iban: z
+    .string()
+    .transform((value) => value.replace(/\s+/g, '').toUpperCase())
+    .refine((value) => value === '' || /^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/.test(value), { error: 'IBAN non valido' })
+    .transform((value) => (value === '' ? null : value)),
   color: z
     .string()
     .transform((value) => (value === '' ? null : value))

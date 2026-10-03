@@ -18,7 +18,8 @@ import { detectDuplicates, type DuplicateStatus, type ExistingTransaction } from
 import { assignOccurrences, fingerprintFor } from './fingerprint'
 import { detectSource, IMPORTERS } from './importers'
 import { detectTransfers, type Counterpart } from '../transfers/detect'
-import type { ColumnMapping, ImportSource, NormalizedTransaction, RowOutcome } from './types'
+import { formatCentsPlain } from './format'
+import type { BalanceMarker, ColumnMapping, ImportSource, NormalizedTransaction, RowOutcome } from './types'
 
 export const MAX_FILE_BYTES = 10 * 1024 * 1024
 const ALLOWED_EXTENSIONS = ['.csv', '.txt']
@@ -45,6 +46,43 @@ export type Analysis = {
   headers: string[]
   mapping: ColumnMapping
   outcomes: RowOutcome[]
+  reconciliation: Reconciliation | null
+}
+
+/** Verifica saldo iniziale + movimenti = saldo finale (solo se la banca dichiara entrambi). */
+export type Reconciliation = {
+  opening: BalanceMarker
+  closing: BalanceMarker
+  movementsCents: number
+  expectedClosingCents: number
+  ok: boolean
+  message: string
+}
+
+export function reconcile(outcomes: readonly RowOutcome[]): Reconciliation | null {
+  const markers = outcomes.flatMap((o) => (o.kind === 'skipped' && o.balance ? [o.balance] : []))
+  const opening = markers.find((m) => m.kind === 'opening')
+  const closing = [...markers].reverse().find((m) => m.kind === 'closing')
+  if (!opening || !closing) return null
+  let movementsCents = 0
+  for (const o of outcomes) {
+    if (o.kind !== 'ok') continue
+    movementsCents += o.transaction.amount
+    for (const part of o.transaction.secondary) movementsCents += part.amount
+  }
+  const expectedClosingCents = opening.amount + movementsCents
+  const ok = expectedClosingCents === closing.amount
+  const text = `saldo iniziale ${formatCentsPlain(opening.amount)} + movimenti ${formatCentsPlain(movementsCents)} = ${formatCentsPlain(expectedClosingCents)}`
+  return {
+    opening,
+    closing,
+    movementsCents,
+    expectedClosingCents,
+    ok,
+    message: ok
+      ? `Riconciliazione riuscita: ${text}, uguale al saldo finale della banca`
+      : `Riconciliazione NON riuscita: ${text}, ma la banca dichiara ${formatCentsPlain(closing.amount)}. Mancano o sono di troppo dei movimenti: verifica il file`,
+  }
 }
 
 export type AnalysisResult = { ok: true; analysis: Analysis } | { ok: false; errors: string[] }
@@ -87,6 +125,7 @@ export function analyzeCsv(
         headers: parsed.headers,
         mapping: mapping.mapping,
         outcomes,
+        reconciliation: reconcile(outcomes),
       },
     }
   } catch (error) {
@@ -123,6 +162,8 @@ export type PreviewRow = {
   classification: Classification | null
   duplicateOfId: string | null
   transferCandidateId: string | null
+  /** Conto proprio dall'altra parte del trasferimento (controparte, IBAN o regola). */
+  transferAccountId: string | null
   raw: Record<string, string>
 }
 
@@ -141,9 +182,21 @@ export type PreviewSummary = {
   periodEnd: IsoDate | null
 }
 
+/** Conto dell'utente, per riconoscere i trasferimenti tra conti propri. */
+export type OwnAccount = {
+  id: string
+  name: string
+  kind: AccountKind
+  iban: string | null
+  /** true se il conto è alimentato da estratti CSV (ha una banca predefinita). */
+  importable: boolean
+}
+
 export type PreviewContext = {
   accountId: string
   accountKind: AccountKind
+  ownAccounts?: readonly OwnAccount[]
+  reconciliation?: Reconciliation | null
   rules: readonly Rule[]
   lookups: Lookups
   existingCash: readonly ExistingTransaction[]
@@ -165,9 +218,29 @@ export function buildPreview(rows: readonly FingerprintedRow[], context: Preview
     context.existingTradeFingerprints,
   )
 
-  const classified = valid.map((r) =>
-    classify({ ...r.transaction, accountId: context.accountId }, context.rules, context.lookups),
-  )
+  const ownAccounts = context.ownAccounts ?? []
+  const byIban = new Map(ownAccounts.filter((a) => a.iban && a.id !== context.accountId).map((a) => [a.iban!, a]))
+  const classified = valid.map((r) => {
+    const base = classify({ ...r.transaction, accountId: context.accountId }, context.rules, context.lookups)
+    // IBAN della controparte = un altro conto dell'utente: trasferimento certo.
+    const own = r.transaction.counterpartyIban ? byIban.get(r.transaction.counterpartyIban) : undefined
+    if (!own || r.transaction.movement !== 'cash') return base
+    const type = own.kind === 'investment' && context.accountKind !== 'investment' && r.transaction.amount < 0 ? 'investment' : 'transfer'
+    const categoryPath = type === 'investment' ? 'Investimenti > Versamenti' : 'Trasferimenti > Giroconto'
+    return {
+      ...base,
+      type,
+      nature: type,
+      categoryId: context.lookups.categoryIdByPath.get(categoryPath) ?? null,
+      businessId: null,
+      incomeSourceId: null,
+      transferAccountId: own.id,
+      confidence: Math.max(base.confidence, 0.95),
+      method: 'rule',
+      reasons: [...base.reasons, `IBAN della controparte = tuo conto ${own.name}`],
+      needsReview: false,
+    } satisfies Classification
+  })
 
   const transfers = detectTransfers(
     valid.map((r, i) => ({
@@ -177,6 +250,7 @@ export function buildPreview(rows: readonly FingerprintedRow[], context: Preview
       confidence: classified[i]!.confidence,
       movement: r.transaction.movement,
       eligible: verdicts[i]!.status === 'new',
+      targetAccountId: classified[i]!.transferAccountId,
     })),
     context.accountKind,
     context.counterparts,
@@ -199,6 +273,7 @@ export function buildPreview(rows: readonly FingerprintedRow[], context: Preview
         categoryId: context.lookups.categoryIdByPath.get(categoryPath) ?? null,
         businessId: null,
         incomeSourceId: null,
+        transferAccountId: transfer.counterpart.accountId,
         confidence: Math.max(classification.confidence, transfer.confidence),
         method: 'rule',
         reasons: [...classification.reasons, `Trasferimento: ${transfer.reason}`],
@@ -207,10 +282,14 @@ export function buildPreview(rows: readonly FingerprintedRow[], context: Preview
     } else if (transfer && 'ambiguous' in transfer) {
       messages.push('Più movimenti compatibili su altri conti: collegamento del trasferimento da verificare')
     }
+    const target = classification.transferAccountId ? ownAccounts.find((a) => a.id === classification.transferAccountId) : undefined
+    if (target && !transferCandidateId && !target.importable && verdict.status === 'new') {
+      messages.push(`Alla conferma verrà registrata la contropartita sul conto ${target.name}`)
+    }
     if (verdict.reason) messages.push(verdict.reason)
     if (r.transaction.secondary.length > 0) {
       for (const part of r.transaction.secondary) {
-        messages.push(`${part.part === 'fee' ? 'Commissione' : 'Imposte'} registrata a parte: ${(Math.abs(part.amount) / 100).toFixed(2).replace('.', ',')} ${r.transaction.currency}`)
+        messages.push(`${part.part === 'fee' ? 'Commissione' : 'Imposte'} registrata a parte: ${formatCentsPlain(Math.abs(part.amount))} ${r.transaction.currency}`)
       }
     }
     previewByRow.set(r.transaction.rowIndex, {
@@ -223,22 +302,30 @@ export function buildPreview(rows: readonly FingerprintedRow[], context: Preview
       classification,
       duplicateOfId: verdict.duplicateOfId,
       transferCandidateId,
+      transferAccountId: classification.transferAccountId,
       raw: r.transaction.raw,
     })
   })
 
+  const reconciliation = context.reconciliation
   return rows.map((r) => {
     if (r.kind === 'ok') return previewByRow.get(r.transaction.rowIndex)!
+    const messages = r.kind === 'invalid' ? r.errors : [r.reason]
+    const closing = reconciliation?.closing
+    if (r.kind === 'skipped' && closing && r.balance?.kind === 'closing' && r.balance.date === closing.date && r.balance.amount === closing.amount) {
+      messages.push(reconciliation.message)
+    }
     return {
       rowIndex: r.rowIndex,
       status: r.kind,
       needsReview: false,
-      messages: r.kind === 'invalid' ? r.errors : [r.reason],
+      messages,
       fingerprint: null,
       transaction: null,
       classification: null,
       duplicateOfId: null,
       transferCandidateId: null,
+      transferAccountId: null,
       raw: r.raw,
     }
   })

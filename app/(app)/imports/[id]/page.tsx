@@ -17,7 +17,7 @@ import { cents } from '@/lib/money'
 import type { ImportSource, TransactionType } from '@/lib/imports/types'
 import { cn } from '@/lib/utils/cn'
 import { requireUser } from '@/server/auth/session'
-import { loadClassificationData } from '@/server/repositories/import-context'
+import { loadClassificationData, loadOwnAccounts } from '@/server/repositories/import-context'
 import { getImportDetail, type ImportDetail } from '@/server/services/imports'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 
@@ -67,7 +67,7 @@ export default async function ImportDetailPage({
   if (!idSchema.safeParse(id).success) notFound()
 
   const db = await createSupabaseServerClient()
-  const [detail, options] = await Promise.all([getImportDetail(db, id), loadClassificationData(db)])
+  const [detail, options, ownAccounts] = await Promise.all([getImportDetail(db, id), loadClassificationData(db), loadOwnAccounts(db)])
   if (!detail) notFound()
 
   const { record, rows } = detail
@@ -75,6 +75,7 @@ export default async function ImportDetailPage({
   const isPreview = record.status === 'preview'
   const categoryLabel = new Map(options.categories.map((c) => [c.id, c.label]))
   const businessLabel = new Map(options.businesses.map((b) => [b.id, b.label]))
+  const accountLabel = new Map(ownAccounts.map((a) => [a.id, a.name]))
   const counts = Object.fromEntries(FILTERS.map((f) => [f.key, rows.filter(f.match).length])) as Record<Filter, number>
   const filter = FILTERS.find((f) => f.key === filterParam) ?? FILTERS[0]!
   const visible = rows.filter(filter.match)
@@ -94,7 +95,14 @@ export default async function ImportDetailPage({
   )
 
   return (
-    <ImportOptionsProvider value={{ categories: options.categories, businesses: options.businesses, incomeSources: options.incomeSources }}>
+    <ImportOptionsProvider
+      value={{
+        categories: options.categories,
+        businesses: options.businesses,
+        incomeSources: options.incomeSources,
+        accounts: ownAccounts.map((a) => ({ id: a.id, label: a.name })),
+      }}
+    >
       <Link href="/imports" className="-ml-2 mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm text-fg-muted hover:text-fg">
         <ArrowLeft aria-hidden className="size-4" />
         Importazioni
@@ -205,7 +213,11 @@ export default async function ImportDetailPage({
                       {type ? (trade ? 'Operazione titoli' : TYPE_LABELS[type]) : <span className="text-fg-subtle">Non classificata</span>}
                     </span>
                     <span className="order-3 min-w-0 truncate text-xs text-fg-muted lg:order-none lg:text-sm">
-                      {[row.proposed_category_id && categoryLabel.get(row.proposed_category_id), row.proposed_business_id && businessLabel.get(row.proposed_business_id)]
+                      {[
+                        row.proposed_category_id && categoryLabel.get(row.proposed_category_id),
+                        row.proposed_business_id && businessLabel.get(row.proposed_business_id),
+                        row.transfer_account_id && `${(row.amount_cents ?? 0) < 0 ? '→' : '←'} ${accountLabel.get(row.transfer_account_id) ?? 'conto'}`,
+                      ]
                         .filter(Boolean)
                         .join(' · ') || '—'}
                     </span>
@@ -230,6 +242,8 @@ export default async function ImportDetailPage({
                           categoryId: row.proposed_category_id,
                           businessId: row.proposed_business_id,
                           incomeSourceId: row.proposed_income_source_id,
+                          transferAccountId: row.transfer_account_id,
+                          accountId: record.account_id,
                           canEdit: editable && !trade,
                           canConfirm: editable && row.needsReview && Boolean(type),
                           canExclude: row.status === 'new' || row.status === 'possible_duplicate',

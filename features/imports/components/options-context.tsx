@@ -7,6 +7,8 @@ export type ImportOptions = {
   categories: (Option & { kind: string })[]
   businesses: Option[]
   incomeSources: (Option & { businessId: string | null })[]
+  /** Conti propri selezionabili come destinazione di un trasferimento. */
+  accounts: Option[]
 }
 
 const OptionsContext = createContext<ImportOptions | null>(null)

@@ -1,5 +1,5 @@
 import { ZERO, type Cents } from '../../money'
-import type { NormalizedTransaction, RowOutcome } from '../types'
+import type { BalanceMarker, NormalizedTransaction, RowOutcome } from '../types'
 
 /** Valori predefiniti di una transazione normalizzata (per comporre gli importer). */
 export function baseTransaction(
@@ -31,8 +31,14 @@ export function invalid(rowIndex: number, raw: Record<string, string>, errors: s
   return { kind: 'invalid', rowIndex, errors, raw }
 }
 
-export function skipped(rowIndex: number, raw: Record<string, string>, reason: string): RowOutcome {
-  return { kind: 'skipped', rowIndex, reason, raw }
+export function skipped(rowIndex: number, raw: Record<string, string>, reason: string, balance?: BalanceMarker): RowOutcome {
+  return balance ? { kind: 'skipped', rowIndex, reason, raw, balance } : { kind: 'skipped', rowIndex, reason, raw }
+}
+
+/** IBAN in forma compatta (senza spazi, maiuscolo), o null se non plausibile. */
+export function normalizeIban(text: string | null | undefined): string | null {
+  const compact = (text ?? '').replace(/\s+/g, '').toUpperCase()
+  return /^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/.test(compact) ? compact : null
 }
 
 export const abs = (value: Cents): Cents => (value < 0 ? (-value as Cents) : value)

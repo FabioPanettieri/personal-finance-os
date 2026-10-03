@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { classify } from '@/lib/categorization/engine'
-import { DEFAULT_RULES, type Rule } from '@/lib/categorization/rules'
+import type { Rule } from '@/lib/categorization/rules'
+
+import { SEED_RULES } from './seed-rules'
 import { toIsoDate } from '@/lib/dates'
 import { cents } from '@/lib/money'
 import { assignOccurrences, fingerprintFor } from '@/lib/imports/fingerprint'
@@ -18,13 +20,13 @@ describe('validazione del file', () => {
     expect(validateFile({ ...ok, type: 'application/pdf' })[0]).toMatch(/Tipo di file non ammesso/)
     expect(validateFile({ ...ok, size: 0, bytes: new Uint8Array() })).toContain('Il file è vuoto')
     expect(validateFile({ ...ok, size: 11 * 1024 * 1024 })).toContain('Il file supera 10 MB')
-    expect(validateFile({ ...ok, bytes: new Uint8Array([0x50, 0x4b, 0, 0]) })[0]).toMatch(/binario/)
+    expect(validateFile({ ...ok, bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0, 0, 0, 0x08, 0]) })[0]).toMatch(/binario/)
   })
 })
 
 describe('classificazione', () => {
   const rows = (source: 'ing' | 'revolut' | 'trade_republic', path: string) =>
-    normalized(source, fixture(path)).map((tx) => ({ tx, c: classify({ ...tx, accountId: 'acc-1' }, DEFAULT_RULES, LOOKUPS) }))
+    normalized(source, fixture(path)).map((tx) => ({ tx, c: classify({ ...tx, accountId: 'acc-1' }, SEED_RULES, LOOKUPS) }))
 
   it('ING: stipendio → entrata con fonte e categoria; bonifico a Revolut → trasferimento', () => {
     const [salary, transfer] = rows('ing', 'ing/fixture-utente.csv')
@@ -60,8 +62,8 @@ describe('classificazione', () => {
     expect(byDesc['Esselunga']).toMatchObject({ type: 'expense', categoryId: 'cat:Alimentazione > Spesa' })
     expect(byDesc['To ING Direct']).toMatchObject({ type: 'transfer' })
     expect(byDesc['Cash at Example ATM']).toMatchObject({ type: null, needsReview: true })
-    // Una riga negativa non è per forza una spesa personale.
-    expect(byDesc['To Trade Republic']).toMatchObject({ type: null })
+    // Regola iniziale del database (0004): verso Trade Republic = investimento, non spesa.
+    expect(byDesc['To Trade Republic']).toMatchObject({ type: 'investment', nature: 'investment' })
   })
 
   it('le regole dell’utente nel database hanno la precedenza sulle predefinite', () => {
@@ -72,7 +74,7 @@ describe('classificazione', () => {
     }
     const c = classify(
       { source: 'revolut', description: 'Amazon EU', counterparty: null, amount: cents(-3000), hint: null, movement: 'cash', accountId: 'acc-1' },
-      [...DEFAULT_RULES, userRule],
+      [...SEED_RULES, userRule],
       LOOKUPS,
     )
     expect(c).toMatchObject({ type: 'expense', nature: 'business', businessId: 'biz:voxel-studio', ruleDbId: 'db-1', confidence: 0.95 })
@@ -81,7 +83,7 @@ describe('classificazione', () => {
   it('mai un tipo incompatibile con il segno', () => {
     const c = classify(
       { source: 'ing', description: 'STIPENDIO RESTITUITO', counterparty: null, amount: cents(-1000), hint: null, movement: 'cash', accountId: 'acc-1' },
-      DEFAULT_RULES,
+      SEED_RULES,
       LOOKUPS,
     )
     expect(c.type).not.toBe('income')
@@ -172,10 +174,17 @@ describe('trasferimenti', () => {
     expect(trRows[1]!.transferCandidateId).toBeNull() // il BUY non è un trasferimento
   })
 
-  it('due controparti compatibili: nessun collegamento automatico', async () => {
+  it('due controparti compatibili sullo stesso conto: abbinamento alla più vicina in data', async () => {
     const twin: Counterpart = { ...ing, id: 'ing-tx-2', bookedOn: toIsoDate('2026-10-03') }
     const csv = 'Type,Product,Started Date,Completed Date,Description,Amount,Fee,Currency,State,Balance\nTOPUP,Current,2026-10-03 09:00:00,2026-10-03 09:00:00,Top-up,300.00,0.00,EUR,COMPLETED,300.00'
     const [row] = await preview('revolut', bytes(csv), { counterparts: [ing, twin] })
+    expect(row!.transferCandidateId).toBe('ing-tx-2')
+  })
+
+  it('controparti compatibili su conti diversi: nessun collegamento automatico', async () => {
+    const other: Counterpart = { ...ing, id: 'sav-tx', accountId: 'acc-sav', accountName: 'ING Conto Risparmio' }
+    const csv = 'Type,Product,Started Date,Completed Date,Description,Amount,Fee,Currency,State,Balance\nTOPUP,Current,2026-10-03 09:00:00,2026-10-03 09:00:00,Top-up,300.00,0.00,EUR,COMPLETED,300.00'
+    const [row] = await preview('revolut', bytes(csv), { counterparts: [ing, other] })
     expect(row!.transferCandidateId).toBeNull()
     expect(row!.messages.join()).toMatch(/Più movimenti compatibili/)
   })
@@ -194,8 +203,8 @@ describe('anteprima', () => {
     const summary = summarizePreview(rows)
     expect(summary).toMatchObject({ total: 16, skipped: 5, invalid: 0, duplicates: 0 })
     expect(summary.ready + summary.toReview).toBe(11)
-    // Da verificare: VOXEL? no (regola) — ATM e "To Trade Republic" senza controparte.
-    expect(rows.filter((r) => r.needsReview).map((r) => r.transaction!.description)).toEqual(['To Trade Republic', 'Cash at Example ATM'])
+    // Da verificare: la ricarica (da un tuo conto o da terzi?) e il prelievo ATM.
+    expect(rows.filter((r) => r.needsReview).map((r) => r.transaction!.description)).toEqual(['Top-up by *0000', 'Cash at Example ATM'])
     expect(summary.periodStart).toBe('2026-10-02')
     expect(summary.periodEnd).toBe('2026-10-16')
   })

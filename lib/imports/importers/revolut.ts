@@ -10,6 +10,9 @@ import { abs, baseTransaction, invalid, skipped } from './shared'
  * ridotte (Date, Description, Amount), con intestazioni in inglese o italiano.
  *
  * Regole strutturali (non parole chiave):
+ * - stati e tipi in inglese o italiano (COMPLETATO, Pagamento con carta, Ricarica…);
+ * - data della transazione = data di completamento; la data di inizio resta nel dato grezzo;
+ * - Ricarica/TOPUP non è mai un trasferimento automatico (può essere un incasso da terzi);
  * - State REVERTED/DECLINED/FAILED: escluse; PENDING: escluse finché non completate
  *   (eviterebbe duplicati quando la stessa operazione torna completata);
  * - Product diverso dal conto corrente (es. Savings): escluse, sono un altro conto;
@@ -30,16 +33,67 @@ const FIELDS: Record<string, FieldSpec> = {
   balance: { aliases: ['Balance', 'Saldo'], required: false },
 }
 
+/** Stati Revolut (export inglese e italiano) → forma canonica. */
+const STATES: Record<string, string> = {
+  COMPLETED: 'COMPLETED',
+  COMPLETATO: 'COMPLETED',
+  COMPLETATA: 'COMPLETED',
+  REVERTED: 'REVERTED',
+  STORNATO: 'REVERTED',
+  STORNATA: 'REVERTED',
+  ANNULLATO: 'REVERTED',
+  ANNULLATA: 'REVERTED',
+  DECLINED: 'DECLINED',
+  RIFIUTATO: 'DECLINED',
+  RIFIUTATA: 'DECLINED',
+  FAILED: 'FAILED',
+  'NON RIUSCITO': 'FAILED',
+  'NON RIUSCITA': 'FAILED',
+  FALLITO: 'FAILED',
+  PENDING: 'PENDING',
+  'IN SOSPESO': 'PENDING',
+  'IN ATTESA': 'PENDING',
+  'IN CORSO': 'PENDING',
+}
+
 const EXCLUDED_STATES: Record<string, string> = {
-  REVERTED: 'Operazione stornata da Revolut (REVERTED)',
-  DECLINED: 'Operazione rifiutata (DECLINED)',
-  FAILED: 'Operazione non riuscita (FAILED)',
+  REVERTED: 'Operazione stornata da Revolut',
+  DECLINED: 'Operazione rifiutata',
+  FAILED: 'Operazione non riuscita',
   PENDING: 'Operazione in sospeso: verrà importata quando risulterà completata',
 }
 
-const CURRENT_PRODUCTS = new Set(['current', 'corrente', 'conto corrente', ''])
+/** Prodotto del conto corrente: "Current" nell'export inglese, "Attuale" in quello italiano. */
+const CURRENT_PRODUCTS = new Set(['current', 'attuale', 'corrente', 'conto corrente', ''])
 
-/** Significato strutturale dei tipi Revolut. null = da decidere con regole o revisione. */
+/** Tipi Revolut (export inglese e italiano) → forma canonica. */
+const TYPES: Record<string, string> = {
+  'PAGAMENTO CON CARTA': 'CARD_PAYMENT',
+  'RIMBORSO CARTA': 'CARD_REFUND',
+  'RIMBORSO SU CARTA': 'CARD_REFUND',
+  RIMBORSO: 'REFUND',
+  RICARICA: 'TOPUP',
+  'TOP-UP': 'TOPUP',
+  PAGAMENTO: 'TRANSFER',
+  TRASFERIMENTO: 'TRANSFER',
+  BONIFICO: 'TRANSFER',
+  CAMBIO: 'EXCHANGE',
+  'CAMBIO VALUTA': 'EXCHANGE',
+  COMMISSIONE: 'FEE',
+  COMMISSIONI: 'FEE',
+  INTERESSI: 'INTEREST',
+  PRELIEVO: 'ATM',
+  'PRELIEVO CONTANTI': 'ATM',
+  PREMIO: 'REWARD',
+}
+
+export function canonicalRevolutType(raw: string): string | null {
+  const upper = raw.trim().toUpperCase()
+  if (!upper) return null
+  return TYPES[upper] ?? upper.replace(/\s+/g, '_')
+}
+
+/** Significato strutturale dei tipi Revolut. type null = da decidere con regole o revisione. */
 function hintFor(type: string, amount: number): StructuralHint | null {
   switch (type) {
     case 'CARD_PAYMENT':
@@ -50,7 +104,10 @@ function hintFor(type: string, amount: number): StructuralHint | null {
     case 'REFUND':
       return amount > 0 ? { type: 'refund', confidence: 0.9, reason: 'Rimborso Revolut' } : null
     case 'TOPUP':
-      return { type: 'transfer', nature: 'transfer', confidence: 0.8, reason: 'Ricarica del conto (top-up)' }
+      // Una ricarica può arrivare da un tuo conto (trasferimento) o da terzi
+      // (Etsy, Stripe, privati…): mai un trasferimento automatico. Decidono le
+      // regole, l'abbinamento con l'altro conto o l'utente.
+      return { type: null, confidence: 0, reason: 'Ricarica: da un tuo conto (trasferimento) o incasso da terzi? Da verificare' }
     case 'EXCHANGE':
       return {
         type: 'transfer',
@@ -68,9 +125,17 @@ function hintFor(type: string, amount: number): StructuralHint | null {
     case 'REWARD':
       return amount > 0 ? { type: 'refund', confidence: 0.6, reason: 'Cashback/premio Revolut' } : null
     default:
-      // TRANSFER, ATM e tipi sconosciuti: il segno non basta a decidere.
+      // TRANSFER/Pagamento, ATM, CARD_CREDIT e tipi sconosciuti: il segno non basta a decidere.
       return null
   }
+}
+
+/** Controparte dalle descrizioni tipiche ("Pagamento da X", "To X", "A favore di X"). */
+export function revolutCounterparty(description: string): string | null {
+  const match = /^(?:pagamento da parte di|pagamento da|pagamento a favore di|pagamento a|a favore di|da parte di|trasferimento (?:da|a)|to|from|payment from|transfer (?:to|from))\s+(.+)$/i.exec(
+    description.trim(),
+  )
+  return match ? match[1]!.trim().slice(0, 200) : null
 }
 
 export const revolutImporter: CsvImporter = {
@@ -84,6 +149,12 @@ export const revolutImporter: CsvImporter = {
       lower.includes(h),
     )
     const base = detectionScore(headers, FIELDS, ['Completed Date', 'Started Date', 'Product', 'State', 'Fee', 'Type'])
+    // Export completo, in inglese o in italiano: coppia data di inizio/completamento + Prodotto/Stato.
+    const full =
+      (lower.includes('completed date') || lower.includes('data di completamento')) &&
+      (lower.includes('started date') || lower.includes('data di inizio')) &&
+      (lower.includes('product') || lower.includes('prodotto') || lower.includes('state') || lower.includes('stato'))
+    if (full) return Math.max(base, 0.95)
     // Le intestazioni inglesi "Date/Description/Amount" senza Saldo/Data valuta indicano Revolut.
     const english = ['description', 'amount'].every((h) => lower.includes(h))
     return hasDate ? (english ? Math.max(base, 0.7) : base * 0.8) : base * 0.3
@@ -99,8 +170,9 @@ export const revolutImporter: CsvImporter = {
   },
 
   normalizeRow(raw, rowIndex, mapping, context): RowOutcome {
-    const state = cell(raw, mapping, 'state').toUpperCase()
-    if (state && EXCLUDED_STATES[state]) return skipped(rowIndex, raw, EXCLUDED_STATES[state])
+    const stateText = cell(raw, mapping, 'state').toUpperCase().replace(/\s+/g, ' ')
+    const state = stateText ? (STATES[stateText] ?? null) : 'COMPLETED'
+    if (state && EXCLUDED_STATES[state]) return skipped(rowIndex, raw, `${EXCLUDED_STATES[state]} (${stateText})`)
 
     const product = cell(raw, mapping, 'product')
     if (mapping.product && !CURRENT_PRODUCTS.has(product.toLowerCase())) {
@@ -109,7 +181,10 @@ export const revolutImporter: CsvImporter = {
 
     const errors: string[] = []
     const warnings: string[] = []
+    if (state === null) warnings.push(`Stato Revolut non riconosciuto: "${stateText}"`)
 
+    // Data della transazione = data di completamento (contabilizzazione); la data
+    // di inizio resta nella riga originale.
     const dateText = cell(raw, mapping, 'completedDate') || cell(raw, mapping, 'startedDate') || cell(raw, mapping, 'date')
     const date = parseDateTime(dateText, context.timeZone)
     if (!date.ok) errors.push(date.error)
@@ -151,7 +226,7 @@ export const revolutImporter: CsvImporter = {
       return skipped(rowIndex, raw, 'Riga con sola commissione e importo zero: non supportata, verificare manualmente')
     }
 
-    const type = cell(raw, mapping, 'type').toUpperCase() || null
+    const type = canonicalRevolutType(cell(raw, mapping, 'type'))
     if (date.value.instant === null && mapping.completedDate && !cell(raw, mapping, 'completedDate')) {
       warnings.push('Data di completamento assente: usata la data di inizio')
     }
@@ -167,7 +242,8 @@ export const revolutImporter: CsvImporter = {
         originalDescription,
         amount: amount.value,
         currency: currency.value,
-        sourceType: type,
+        sourceType: cell(raw, mapping, 'type') || null,
+        counterparty: revolutCounterparty(description),
         fee: feeValue,
         secondary,
         hint: type ? hintFor(type, amount.value) : null,
