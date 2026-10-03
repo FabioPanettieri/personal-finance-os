@@ -30,3 +30,27 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+
+  # Percorso completo contro lo stack Supabase locale (Docker sul runner):
+  # migration reali, tipi generati, RLS via SQL e via API, E2E con login e TOTP veri.
+  supabase-local:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:start
+      - name: Tipi generati allineati al database
+        run: |
+          npm run db:types
+          git diff --exit-code -- types/database.ts
+      - run: npm run test:db:supabase
+      - run: npm run test:integration
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:local
+      - if: always()
+        run: npm run db:stop

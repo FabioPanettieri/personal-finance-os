@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-/** Credenziali fittizie del finto Supabase (tests/e2e/mock-supabase.mjs). */
+/** Credenziali fittizie del finto Supabase (tests/e2e/mock/mock-supabase.mjs). */
 const USER = { email: 'owner@example.test', password: 'correct-horse-battery', totp: '123456' }
 const MOCK = 'http://127.0.0.1:54399'
 
@@ -67,6 +67,9 @@ test('credenziali errate: messaggio generico, nessun accesso', async ({ page }) 
   await login(page, 'password-sbagliata')
   await expect(page.getByRole('main').getByRole('alert')).toHaveText('Email o password non corretti.')
   await expect(page).toHaveURL(/\/login/)
+  // Regressione: dopo l'errore l'email resta compilata, la password no.
+  await expect(page.getByLabel('Email')).toHaveValue(USER.email)
+  await expect(page.getByLabel('Password')).toHaveValue('')
 })
 
 test('validazione lato server del form di login', async ({ page }) => {

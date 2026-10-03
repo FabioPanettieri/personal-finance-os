@@ -157,8 +157,8 @@ sessione e reindirizza a `/login`.
 | `/` | Dashboard: patrimonio, KPI, cash flow, entrate/spese | 6 |
 | `/transactions` | Transaction Explorer (filtri in query string) | 4 |
 | `/transactions/[id]` | Dettaglio/modifica (drawer su desktop, pagina su mobile) | 4 |
-| `/accounts` | Elenco conti e saldi | 2 |
-| `/accounts/[id]` | Dettaglio conto, andamento saldo, movimenti | 2 |
+| `/accounts` | Elenco conti, saldi, totale per valuta (su mobile da Patrimonio) | 2 ✓ |
+| `/accounts/[id]` | Dettaglio: saldo, entrate, uscite, trasferimenti, grafico, impostazioni | 2 ✓ |
 | `/net-worth` | Patrimonio per conto + storico | 5–9 |
 | `/analytics` | Hub analytics (entrate, spese, categorie) | 6 |
 | `/analytics/business` | Personale vs Business | 7 |

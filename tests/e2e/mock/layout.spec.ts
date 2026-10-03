@@ -63,7 +63,7 @@ test('navigazione: sidebar su desktop, bottom nav su mobile', async ({ page, isM
   expect(overflow).toBeLessThanOrEqual(0)
 
   await page.goto('/')
-  await page.screenshot({ path: `tests/e2e/screenshots/home-${testInfo.project.name}-light.png`, fullPage: true })
+  await page.screenshot({ path: `tests/e2e/screenshots/mock-home-${testInfo.project.name}-light.png`, fullPage: true })
 })
 
 test('tema scuro persistente', async ({ page }, testInfo) => {
@@ -78,5 +78,14 @@ test('tema scuro persistente', async ({ page }, testInfo) => {
   await expect(html).toHaveAttribute('data-theme', 'dark')
   await page.reload()
   await expect(html).toHaveAttribute('data-theme', 'dark')
-  await page.screenshot({ path: `tests/e2e/screenshots/home-${testInfo.project.name}-dark.png`, fullPage: true })
+  await page.screenshot({ path: `tests/e2e/screenshots/mock-home-${testInfo.project.name}-dark.png`, fullPage: true })
+})
+
+test('conti: stato vuoto se il database non restituisce conti', async ({ page }) => {
+  await page.goto('/accounts')
+  await expect(page.getByRole('heading', { name: 'Nessun conto' })).toBeVisible()
+  await page.goto('/accounts/00000000-0000-4000-8000-000000000999')
+  await expect(page.getByRole('heading', { name: 'Conto non trovato' })).toBeVisible()
+  await page.goto('/accounts/non-un-uuid')
+  await expect(page.getByRole('heading', { name: 'Conto non trovato' })).toBeVisible()
 })

@@ -39,6 +39,16 @@ Creazione del proprietario (una tantum): Supabase Dashboard → Authentication �
 Users → *Add user* (oppure Studio locale con `supabase start`). Al primo
 accesso l'app impone la configurazione del TOTP.
 
+### Rischio aperto: MFA non imposta a livello di database
+
+Le policy RLS verificano `user_id = auth.uid()` ma non il livello di
+autenticazione. Il TOTP è obbligatorio nell'app (proxy + layout), ma un token
+ottenuto con la sola password (AAL1) può interrogare direttamente l'API
+PostgREST con la publishable key e leggere i propri dati. Mitigazione proposta
+(richiede una migration, in attesa di approvazione): policy `as restrictive`
+su ogni tabella utente che richiedono `(select auth.jwt() ->> 'aal') = 'aal2'`,
+più test SQL e di integrazione dedicati.
+
 ## Cosa l'app NON fa (per scelta)
 
 - Non chiede né memorizza credenziali di ING, Revolut o Trade Republic.

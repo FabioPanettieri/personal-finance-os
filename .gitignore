@@ -1,6 +1,7 @@
 node_modules/
 .next/
 .next-e2e/
+.next-e2e-local/
 out/
 coverage/
 next-env.d.ts

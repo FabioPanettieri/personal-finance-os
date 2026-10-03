@@ -52,5 +52,5 @@ export default defineConfig([
     files: ['tests/e2e/**/*.mjs', 'scripts/**'],
     rules: { 'no-console': 'off' },
   },
-  globalIgnores(['.next/**', '.next-e2e/**', 'out/**', 'build/**', 'next-env.d.ts', 'playwright-report/**', 'test-results/**']),
+  globalIgnores(['.next/**', '.next-e2e/**', '.next-e2e-local/**', 'out/**', 'build/**', 'next-env.d.ts', 'playwright-report/**', 'test-results/**']),
 ])

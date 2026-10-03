@@ -33,8 +33,9 @@ export async function signIn(_prev: FormState, formData: FormData): Promise<Form
     password: formData.get('password'),
     next: formData.get('next') ?? undefined,
   })
+  const email = typeof formData.get('email') === 'string' ? String(formData.get('email')).slice(0, 254) : ''
   if (!parsed.success) {
-    return { status: 'error', fieldErrors: fieldErrorsFrom(parsed.error) }
+    return { status: 'error', fieldErrors: fieldErrorsFrom(parsed.error), email }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -45,9 +46,9 @@ export async function signIn(_prev: FormState, formData: FormData): Promise<Form
 
   if (error) {
     if (error.status === 429) {
-      return { status: 'error', message: 'Troppi tentativi. Riprova tra qualche minuto.' }
+      return { status: 'error', message: 'Troppi tentativi. Riprova tra qualche minuto.', email }
     }
-    return { status: 'error', message: 'Email o password non corretti.' }
+    return { status: 'error', message: 'Email o password non corretti.', email }
   }
 
   // Dopo la password la sessione è AAL1: si va direttamente al passaggio TOTP.

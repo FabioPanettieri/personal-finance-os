@@ -7,7 +7,7 @@ import { ROUTES, loginUrlFor, mfaStepFor } from '@/lib/auth/access'
 import { getSupabaseConfig } from '@/lib/env'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 import { resolveSession, type ResolvedSession, type VerifiedUser } from '@/server/supabase/session'
-import type { Profile } from '@/types/database'
+import type { Profile } from '@/types/domain'
 
 /** Stato auth della richiesta corrente, calcolato una sola volta per render. */
 export const getAuth = cache(async (): Promise<ResolvedSession> => {

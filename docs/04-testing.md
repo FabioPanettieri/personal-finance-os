@@ -5,7 +5,7 @@
 | Database | Suite SQL su PostgreSQL reale (`scripts/db-test-local.sh`) | RLS, isolamento utenti, vincoli, trigger, audit, storage | Ogni migration, CI |
 | Unit | Vitest | `lib/*`: money, dates, csv, imports, transfers, categorization, analytics | Ogni modifica, CI |
 | Integration | Vitest + Supabase locale | Server actions/repository: import end-to-end, commit idempotente | Sprint 3+, CI |
-| E2E | Playwright su build di produzione + finto Supabase Auth (`tests/e2e/mock-supabase.mjs`) | Protezione route, login, MFA, persistenza sessione, logout, header di sicurezza, CSP, layout desktop/mobile, tema | Dallo Sprint 1, CI |
+| E2E | Playwright su build di produzione: `tests/e2e/mock` (finto Supabase Auth) e `tests/e2e/local` (stack Supabase locale reale) | Protezione route, login, MFA, persistenza sessione, logout, header di sicurezza, CSP, layout desktop/mobile, tema | Dallo Sprint 1, CI |
 | Statico | `tsc --noEmit`, ESLint, Prettier | 0 errori, nessun `any` non motivato | Ogni commit |
 
 ## Casi obbligatori (specifica §42)
@@ -44,7 +44,12 @@
 | `npm test` | Vitest (unit + componenti), processo in fuso `America/Los_Angeles` per far emergere slittamenti di data |
 | `npm run test:db` | Migration + suite SQL su PostgreSQL temporaneo |
 | `npm run test:e2e` | Build in `.next-e2e` collegata al finto Supabase, poi Playwright desktop + mobile (`PLAYWRIGHT_CHROMIUM_PATH` per usare un Chromium già installato) |
-| `npm run check` | Tutto quanto sopra, in ordine |
+| `npm run db:start` / `db:stop` | Stack Supabase locale (Docker) con le migration applicate |
+| `npm run db:types` | Rigenera `types/database.ts` dallo schema locale |
+| `npm run test:db:supabase` | Stessa suite SQL sul Postgres dello stack locale (schemi `auth`/`storage` veri), in una transazione annullata |
+| `npm run test:integration` | Vitest contro l'API locale: repository → supabase-js → PostgREST → Postgres → RLS |
+| `npm run test:e2e:local` | Playwright contro lo stack locale: login, TOTP reale (RFC 6238), sezione Conti |
+| `npm run check` | typecheck, lint, unit, DB, build, E2E con mock |
 
 Il finto Supabase implementa solo l'API GoTrue usata dall'app (password,
 refresh, utente, TOTP, logout) con JWT HS256 reali e un utente fittizio: il

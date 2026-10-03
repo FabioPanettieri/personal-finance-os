@@ -12,8 +12,8 @@ type Section = { label: string; description: string; href?: string; sprint?: num
 
 const SECTIONS: Section[] = [
   { label: 'Sicurezza', description: 'Sessione, verifica in due passaggi, uscita', href: '/settings/security' },
-  { label: 'Profilo', description: 'Nome, valuta, fuso orario', sprint: 2 },
-  { label: 'Conti', description: 'Conti correnti, carte, broker', sprint: 2 },
+  { label: 'Conti', description: 'Nomi, saldi iniziali, attivazione', href: '/accounts' },
+  { label: 'Profilo', description: 'Nome, valuta, fuso orario', sprint: 12 },
   { label: 'Import CSV', description: 'Mapping delle colonne per banca', sprint: 3 },
   { label: 'Categorie', description: 'Categorie e sottocategorie', sprint: 4 },
   { label: 'Business', description: 'VOXEL Studio, Il Progettista Meccanico…', sprint: 7 },

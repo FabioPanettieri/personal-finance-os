@@ -146,5 +146,19 @@ erDiagram
 
 ## Generazione tipi
 
-`supabase gen types typescript --linked > types/database.ts` dopo ogni migration;
-i tipi di dominio in `types/domain.ts` restringono i tipi generati (es. `Cents`).
+`types/database.ts` è generato da `npm run db:types` (`supabase gen types
+typescript --local` sullo stack locale, poi formattato con Prettier: l'output
+è deterministico). Non si modifica a mano. Alias comodi in `types/domain.ts`.
+Due controlli impediscono che i tipi divergano dallo schema:
+`tests/unit/generated-types.test.ts` (tabelle, viste, enum confrontati con le
+migration) e il job CI `supabase-local`, che rigenera i tipi e fallisce se
+`git diff` non è vuoto.
+
+## Lettura dei movimenti
+
+PostgREST restituisce al massimo 1000 righe per richiesta (`max_rows`) e tronca
+in silenzio. Le letture che devono essere complete (flussi e grafico di un
+conto) paginano con `range()` fino all'ultima pagina
+(`server/repositories/accounts.ts`, verificato con 1.205 righe in
+`tests/integration/accounts.test.ts`). Per gli aggregati su molti conti e anni
+(dashboard, Sprint 6) andrà valutata una vista o funzione SQL dedicata.

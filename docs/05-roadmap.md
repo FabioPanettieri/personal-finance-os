@@ -108,3 +108,59 @@ report "SPRINT X — COMPLETED" qui sotto.
 - La PWA (manifest, service worker) resta allo Sprint 12, come da piano.
 
 **Next sprint**: Sprint 2 — Accounts.
+
+## SPRINT 2 — COMPLETED
+
+**Implemented**
+- Stack Supabase locale reale (CLI 2.119 via npm, Docker): Postgres 17,
+  Auth, PostgREST, Storage; script `db:start`, `db:stop`, `db:reset`, `db:types`
+- `types/database.ts` generato da `supabase gen types` (26 tabelle, 1 vista,
+  15 enum, coerenti con le migration; output deterministico)
+- `/accounts`: elenco conti attivi e disattivati con saldo, istituto, valuta,
+  tipo, numero di transazioni, data dell'ultima transazione; saldo complessivo
+  per valuta (liquidità + conti investimento al versato netto)
+- `/accounts/[id]`: saldo, entrate, uscite (al netto dei rimborsi),
+  trasferimenti in/out, versamenti verso investimenti, numero transazioni,
+  ultima attività, grafico del saldo (solo con dati in ≥ 2 giorni), stato vuoto
+- Modifica di nome, istituto, colore, saldo iniziale e relativa data;
+  attivazione/disattivazione; valuta e tipo in sola lettura
+- Repository tipizzato (`server/repositories/accounts.ts`) con lettura dei
+  movimenti a pagine, logica pura in `lib/accounts`, parsing importi italiani
+  in `lib/money/parse.ts`, scale grafiche in `lib/charts/scale.ts`
+- Navigazione: Conti nella sidebar desktop; su mobile da Patrimonio e
+  Impostazioni, senza nuove voci nella bottom nav (che evidenzia Patrimonio)
+- CI: nuovo job `supabase-local` (stack locale, verifica tipi, SQL, API, E2E reali)
+
+**Database**
+- Nessuna nuova migration; le 4 migration dello Sprint 0 sono invariate e si
+  applicano senza errori su Supabase locale (Postgres 17).
+- Saldo mai memorizzato: viene dalla vista `account_balances`.
+
+**Tests**
+- Unit e componenti: 120 passed
+- SQL su Postgres temporaneo: 73 passed (59 dello Sprint 0 + 14 su account/RLS)
+- SQL su Supabase locale (schemi auth/storage reali): 73 passed
+- Integrazione API su Supabase locale: 17 passed
+- E2E con finto Supabase: 24 passed (desktop + mobile)
+- E2E su Supabase locale: 11 passed, 1 saltato per scelta (desktop + mobile)
+
+**Bug trovati e corretti**
+- `supabase/config.toml` (Sprint 1): `[auth.email] enable_signup = false`
+  disattivava l'intero provider email, quindi anche il login. La registrazione
+  resta bloccata da `[auth] enable_signup = false`; test di integrazione dedicati.
+- Form (login dello Sprint 1 e modifica conto): React 19 azzera i campi dopo una
+  Server Action, quindi dopo un errore di validazione i valori digitati si
+  perdevano e un salvataggio successivo poteva scrivere il saldo iniziale
+  sbagliato. Fix: l'action restituisce i valori inviati. Regressione in E2E.
+- Etichetta dell'ultima attività troncata su mobile.
+
+**Known issues**
+- RLS non richiede AAL2: vedi docs/02-security.md, migration proposta in attesa
+  di approvazione.
+- `npm audit`: 5 vulnerabilità "high" solo negli strumenti di sviluppo
+  (`eslint-config-next` → `fast-glob` → `micromatch` → `braces`), nessuna in
+  produzione; la sola correzione disponibile è un downgrade a Next 14.
+- Creazione ed eliminazione di conti non incluse (non richieste); un conto si
+  archivia disattivandolo.
+
+**Next sprint**: Sprint 3 — CSV Import.

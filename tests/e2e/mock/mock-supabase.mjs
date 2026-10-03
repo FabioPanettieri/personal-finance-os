@@ -199,6 +199,12 @@ const server = createServer(async (req, res) => {
       return send(res, 200, single ? row : [row])
     }
 
+    // Conti: nessun conto (stato vuoto). I conti reali si testano in tests/e2e/local.
+    if (req.method === 'GET' && (path === '/rest/v1/accounts' || path === '/rest/v1/account_balances')) {
+      if (!claims) return send(res, 401, { message: 'JWT required' })
+      return send(res, 200, [])
+    }
+
     return send(res, 404, { message: `mock: ${req.method} ${path} non implementato` })
   } catch (error) {
     return send(res, 500, { message: String(error) })

@@ -21,6 +21,8 @@ export type FormState = {
   status: 'idle' | 'error'
   message?: string
   fieldErrors?: Partial<Record<string, string>>
+  /** Email inviata, per ripresentarla dopo un errore (React 19 azzera il form). Mai la password. */
+  email?: string
 }
 
 export const IDLE: FormState = { status: 'idle' }

@@ -96,5 +96,11 @@ con `••••` — utile mostrando l'app in pubblico.
   `Money`, `DeltaBadge`, `KpiCard`, `Skeleton`, `Spinner`, `EmptyState`,
   `ErrorState`, `PageHeader`. Layout in `components/layout`: `AppShell`,
   `Sidebar`, `BottomNav`, `ThemeToggle`, `UserBadge`, `SignOutButton`, `ComingSoon`.
+- Grafico saldo (`features/accounts/components/balance-chart.tsx`): SVG
+  disegnato in proprio, serie singola nel colore accent, linea a gradini da
+  2px (il saldo cambia solo a fine giornata, nessuna interpolazione), area al
+  10%, griglia hairline, punto finale con anello di superficie, mirino +
+  tooltip al passaggio o con le frecce, tabella dati sempre disponibile. I
+  grafici interattivi multi-serie della dashboard useranno Recharts (Sprint 6).
 - Stati: `loading.tsx` (skeleton), `error.tsx` (con Riprova e riferimento
   opaco), `not-found.tsx`, `global-error.tsx`; "—" indica assenza di dati, mai zero.

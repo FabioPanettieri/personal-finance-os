@@ -32,6 +32,7 @@ export function LoginForm({ next, configIssue }: { next: string; configIssue: st
           type="email"
           autoComplete="username"
           inputMode="email"
+          defaultValue={state.email}
           required
           disabled={disabled}
           error={state.fieldErrors?.email}

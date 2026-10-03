@@ -5,7 +5,7 @@ movimenti di ING Direct, Revolut e Trade Republic tramite import CSV e li
 trasforma in una base dati storica per patrimonio, entrate, spese, business e
 investimenti.
 
-Stato: **Sprint 1 — Foundation** completato. Vedi [`docs/05-roadmap.md`](docs/05-roadmap.md).
+Stato: **Sprint 2 — Accounts** completato. Vedi [`docs/05-roadmap.md`](docs/05-roadmap.md).
 
 ## Stack
 
@@ -24,7 +24,21 @@ npm run dev                  # http://localhost:3000
 Senza variabili Supabase l'app parte comunque, ma resta chiusa: il login
 mostra quali variabili mancano e nessuna pagina protetta è raggiungibile.
 
-### Collegare Supabase
+### Stack Supabase locale (consigliato per lo sviluppo)
+
+Richiede Docker. Nessun progetto cloud, nessun dato reale.
+
+```bash
+npm run db:start          # Postgres + Auth + PostgREST + Storage, migration applicate
+npx supabase status       # URL e publishable key locali da copiare in .env.local
+npm run dev
+```
+
+Crea l'utente di sviluppo da Studio locale (`npx supabase start` senza `-x studio`)
+oppure con l'Admin API usando la secret key **locale**. `npm run db:reset`
+riapplica le migration da zero; `npm run db:stop` ferma lo stack.
+
+### Collegare un progetto Supabase
 
 1. Crea il progetto (regione EU) oppure avvia lo stack locale con `supabase start`.
 2. Applica le migration di `supabase/migrations/` (`supabase db push` o SQL Editor).
@@ -46,6 +60,11 @@ mostra quali variabili mancano e nessuna pagina protetta è raggiungibile.
 | `npm test` | Test unitari e di componente |
 | `npm run test:db` | Migration + test RLS su PostgreSQL temporaneo (richiede PostgreSQL 15+) |
 | `npm run test:e2e` | E2E Playwright su build di produzione con finto Supabase Auth |
+| `npm run db:start` / `db:stop` / `db:reset` | Stack Supabase locale |
+| `npm run db:types` | Rigenera `types/database.ts` |
+| `npm run test:db:supabase` | Test SQL sul database dello stack locale |
+| `npm run test:integration` | Test di integrazione contro l'API locale |
+| `npm run test:e2e:local` | E2E contro lo stack locale (login e TOTP reali) |
 | `npm run check` | Tutti i controlli |
 
 ## Documentazione

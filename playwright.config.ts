@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 /**
  * E2E contro una build di produzione reale (`.next-e2e`) collegata a un finto
- * Supabase Auth locale (tests/e2e/mock-supabase.mjs). Nessun servizio esterno.
+ * Supabase Auth locale (tests/e2e/mock/mock-supabase.mjs). Nessun servizio esterno.
  */
 const APP_PORT = 3100
 const MOCK_PORT = 54399
@@ -15,7 +15,7 @@ const appEnv = {
 }
 
 export default defineConfig({
-  testDir: 'tests/e2e',
+  testDir: 'tests/e2e/mock',
   fullyParallel: false,
   workers: 1,
   retries: 0,
@@ -31,7 +31,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'node tests/e2e/mock-supabase.mjs',
+      command: 'node tests/e2e/mock/mock-supabase.mjs',
       url: `http://127.0.0.1:${MOCK_PORT}/__health`,
       env: { MOCK_SUPABASE_PORT: String(MOCK_PORT) },
       reuseExistingServer: false,

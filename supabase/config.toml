@@ -27,7 +27,11 @@ minimum_password_length = 12
 password_requirements = "lower_upper_letters_digits"
 
 [auth.email]
-enable_signup = false
+# ATTENZIONE: qui `enable_signup` abilita il provider email nel suo complesso
+# (login compreso). Va lasciato a true: la registrazione pubblica è già
+# bloccata da `[auth] enable_signup = false` (verificato da
+# tests/integration/auth.test.ts).
+enable_signup = true
 enable_confirmations = false
 
 [auth.mfa]

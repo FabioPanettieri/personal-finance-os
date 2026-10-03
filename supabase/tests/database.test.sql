@@ -292,6 +292,32 @@ select set_config('request.jwt.claim.sub', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
 select tests.ok((select count(*) from storage.objects) = 0, 'storage: B non vede i file di A');
 select tests.ok((select count(*) from public.transactions) = 1, 'RLS: B vede solo la propria transazione');
 
+-- Account (Sprint 2) ------------------------------------------------------------
+
+select tests.ok((select count(*) from public.accounts) = 3, 'account: B vede solo i propri 3 conti');
+select tests.ok(
+  (select count(*) from public.accounts where id in (:'a_ing', :'a_rev', :'a_tr')) = 0,
+  'account: B non legge i conti di A neppure conoscendone l''id');
+select tests.ok(
+  (select count(*) from public.account_balances where account_id = :'a_ing') = 0,
+  'account: B non vede il saldo dei conti di A (vista security_invoker)');
+select tests.ok(
+  (select count(*) from public.account_balances) = 3,
+  'account: la vista saldi di B contiene solo i suoi 3 conti');
+
+with attempted as (
+  update public.accounts set name = 'Preso da B', is_active = false, initial_balance_cents = 999999
+  where id = :'a_ing' returning id
+)
+select tests.ok((select count(*) from attempted) = 0, 'account: B non può modificare nome, stato o saldo iniziale dei conti di A');
+
+with attempted as (delete from public.accounts where id = :'a_rev' returning id)
+select tests.ok((select count(*) from attempted) = 0, 'account: B non può cancellare i conti di A');
+
+select tests.throws(
+  format($$update public.accounts set user_id = %L where name = 'ING Direct'$$, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+  '42501', 'account: B non può regalare un proprio conto ad A');
+
 -- Anonimo ----------------------------------------------------------------------
 
 reset role;
@@ -300,10 +326,31 @@ select set_config('request.jwt.claim.sub', '', false);
 select tests.throws($$select count(*) from public.accounts$$, '42501', 'anon: nessun accesso ai conti');
 select tests.throws($$select count(*) from public.transactions$$, '42501', 'anon: nessun accesso alle transazioni');
 select tests.throws($$select count(*) from public.profiles$$, '42501', 'anon: nessun accesso ai profili');
+select tests.throws($$select count(*) from public.account_balances$$, '42501', 'anon: nessun accesso alla vista saldi');
+select tests.throws($$update public.accounts set name = 'x'$$, '42501', 'anon: nessuna modifica ai conti');
 
 -- Cancellazione account utente -------------------------------------------------
 
 reset role;
+
+select tests.ok(
+  (select name = 'ING Direct' and is_active and initial_balance_cents = 0 from public.accounts where id = :'a_ing'),
+  'account: i conti di A sono rimasti intatti dopo i tentativi di B');
+select tests.ok(
+  (select count(*) from public.accounts where id = :'a_rev') = 1,
+  'account: il conto Revolut di A esiste ancora');
+select tests.ok(
+  (select array_agg(name order by sort_order) from public.accounts where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+    = array['ING Direct', 'Revolut', 'Trade Republic'],
+  'bootstrap: ING Direct, Revolut e Trade Republic appartengono all''utente creato');
+select tests.ok(
+  (select count(distinct user_id) = 2 and count(*) = 6 from public.accounts),
+  'bootstrap: ogni utente ha i propri conti distinti (3 + 3)');
+select tests.ok(
+  (select a.account_type = 'broker' from public.accounts a where a.id = :'a_tr')
+    and (select count(*) from public.investment_accounts where account_id = :'a_tr') = 1,
+  'bootstrap: Trade Republic è un conto broker collegato a investment_accounts');
+
 delete from auth.users where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 select tests.ok(
   (select count(*) from public.accounts where user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') = 0,
