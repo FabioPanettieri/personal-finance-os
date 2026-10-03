@@ -5,7 +5,7 @@ movimenti di ING Direct, Revolut e Trade Republic tramite import CSV e li
 trasforma in una base dati storica per patrimonio, entrate, spese, business e
 investimenti.
 
-Stato: **Sprint 2 — Accounts** completato. Vedi [`docs/05-roadmap.md`](docs/05-roadmap.md).
+Stato: **Sprint 3 — CSV Import** completato (validato solo con fixture sintetiche). Vedi [`docs/05-roadmap.md`](docs/05-roadmap.md).
 
 ## Stack
 

@@ -75,6 +75,20 @@ consentito; isolamento tra utenti anche in AAL2; anonimo negato. Un test di
 copertura fallisce se una tabella futura con `user_id` non ha la policy AAL2.
 Controprova: senza la migration 0005 questi test falliscono.
 
+### Importazioni (Sprint 3)
+
+- Upload, anteprima, correzioni e conferma passano da Server Action con
+  `requireUser()` (sessione AAL2) e dal client Supabase dell'utente: RLS e
+  policy AAL2 valgono anche per Storage, `imports`, `import_files`,
+  `import_rows`, `transactions` e `investment_transactions`.
+- File: ≤ 10 MB, estensione `.csv`, MIME ammessi, rifiuto dei contenuti
+  binari, decodifica esplicita, celle senza caratteri di controllo e con
+  lunghezza limitata, massimo 50.000 righe. Nessuna valutazione del contenuto.
+- Il file originale non è mai modificato (nessuna policy di update sullo Storage).
+- Verificato con test di integrazione: AAL1 non può creare importazioni; un
+  altro utente non legge importazioni, righe, file o transazioni, non modifica
+  righe, non conferma e non importa su conti altrui.
+
 ## Cosa l'app NON fa (per scelta)
 
 - Non chiede né memorizza credenziali di ING, Revolut o Trade Republic.

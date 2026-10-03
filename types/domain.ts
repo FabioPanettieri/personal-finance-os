@@ -8,3 +8,7 @@ export type Enums<T extends keyof PublicSchema['Enums']> = PublicSchema['Enums']
 
 export type Profile = Tables<'profiles'>
 export type TransactionType = Enums<'transaction_type'>
+export type TablesInsert<T extends keyof PublicSchema['Tables']> = PublicSchema['Tables'][T]['Insert']
+export type TablesUpdate<T extends keyof PublicSchema['Tables']> = PublicSchema['Tables'][T]['Update']
+export type ImportRowRecord = Tables<'import_rows'>
+export type ImportRecord = Tables<'imports'>

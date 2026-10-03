@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
   // Build separata per i test E2E (puntano a un finto Supabase): non tocca .next.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   poweredByHeader: false,
+  experimental: {
+    // CSV fino a 10 MB (limite del bucket) + margine per il multipart.
+    serverActions: { bodySizeLimit: '11mb' },
+    proxyClientMaxBodySize: '11mb',
+  },
   reactStrictMode: true,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]

@@ -1,0 +1,4 @@
+"datetime","date","account_type","category","type","asset_class","name","symbol","shares","price","amount","fee","tax","currency","original_amount","original_currency","fx_rate","description","transaction_id","counterparty_name","counterparty_iban","payment_reference","mcc_code"
+"2026-10-01T10:15:00.000Z","2026-10-01","DEFAULT","CASH","CUSTOMER_INBOUND","","","","","","200.00","","","EUR","","","","PAC mensile","TEST-TR-DUP-1","","","",""
+"2026-10-01T10:15:00.000Z","2026-10-01","DEFAULT","CASH","CUSTOMER_INBOUND","","","","","","200.00","","","EUR","","","","PAC mensile","TEST-TR-DUP-1","","","",""
+"2026-10-01T10:15:00.000Z","2026-10-01","DEFAULT","CASH","CUSTOMER_INBOUND","","","","","","200.00","","","EUR","","","","PAC mensile","TEST-TR-DUP-2","","","",""

@@ -169,9 +169,9 @@ sessione e reindirizza a `/login`.
 | `/reports/annual` | Report annuale (`?year=2026`) | 9 |
 | `/reports/compare` | Confronto anni | 9 |
 | `/goals` | Obiettivi | 10 |
-| `/imports` | Storico importazioni | 3 |
-| `/imports/new` | Wizard: banca → conto → file → mapping → anteprima → conferma | 3 |
-| `/imports/[id]` | Dettaglio importazione / anteprima in corso | 3 |
+| `/imports` | Storico importazioni | 3 ✓ |
+| `/imports/new` | Banca → conto → file → anteprima | 3 ✓ |
+| `/imports/[id]` | Anteprima con filtri e correzioni, conferma; dettaglio a importazione completata | 3 ✓ |
 | `/settings` | Indice impostazioni | 1+ |
 | `/settings/{profile,accounts,categories,businesses,income-sources,rules,imports,goals,preferences,security}` | Sezioni §44 | 2–11 |
 
@@ -265,8 +265,47 @@ TransactionEditor → Server Action (Zod) → repository.update (RLS)
   → revalidatePath delle viste interessate
 ```
 
+## 7.4 Importazione CSV — implementazione (Sprint 3)
+
+| Fase | Modulo |
+|---|---|
+| Validazione file (estensione, MIME, ≤ 10 MB, non binario) | `lib/imports/pipeline.ts` → `validateFile` |
+| Decodifica (BOM, UTF-8, UTF-16, Windows-1252) | `lib/csv/decode.ts` |
+| Riconoscimento fonte (punteggio per importer) | `lib/imports/importers/index.ts` → `detectSource` |
+| Parsing e delimitatore | `lib/csv/parse.ts` |
+| Mapping colonne (alias IT/EN) | `lib/imports/importers/mapping.ts` |
+| Normalizzazione (`NormalizedTransaction`) | `INGImporter`, `RevolutImporter`, `TradeRepublicImporter` (interfaccia `CsvImporter`) |
+| Duplicati | `lib/imports/fingerprint.ts`, `lib/imports/duplicates.ts` |
+| Classificazione (regole configurabili) | `lib/categorization/engine.ts`, `rules.ts` + `categorization_rules` |
+| Trasferimenti | `lib/transfers/detect.ts` |
+| Anteprima, correzioni, conferma | `server/services/imports.ts`, `/imports/[id]` |
+
+Scelte principali:
+- **Nessuna scrittura durante il parsing**: l'anteprima salva solo `imports`,
+  `import_files` e `import_rows`; le transazioni nascono alla conferma.
+- **File originale** nel bucket privato `imports/{uid}/{import_id}/{sha256}.csv`,
+  mai modificato; `import_rows.raw` conserva ogni riga originale.
+- **Una riga CSV = una `import_row`**. Commissioni e imposte della stessa riga
+  diventano movimenti di cassa separati alla conferma (fingerprint derivato),
+  così i saldi restano corretti.
+- **Classificazione**: suggerimento strutturale della fonte (es. Revolut
+  `TOPUP`, Trade Republic `BUY`), poi la prima regola applicabile — regole
+  dell'utente nel database prima delle predefinite (dati, non codice). Mai un
+  tipo incompatibile con il segno. Confidenza < 0,6 o nessun tipo → **Da
+  verificare**: la conferma è bloccata finché l'utente non classifica o esclude.
+- **Trade Republic**: `BUY`/`SELL`/PAC vanno in `investment_transactions` (non
+  sono spese né movimenti di cassa); versamenti e prelievi sono trasferimenti;
+  dividendi e interessi entrate con natura investimento; il saldo del conto
+  broker resta "liquidità al costo" fino allo Sprint 8 (valore di mercato).
+- **Revolut**: righe REVERTED/DECLINED/PENDING, prodotti diversi dal conto
+  corrente e valute diverse dalla valuta del conto vengono escluse con il motivo.
+- **Conferma idempotente**: ogni inserimento usa `upsert … ignoreDuplicates` su
+  `(account_id, fingerprint)`; un nuovo tentativo dopo un errore non duplica nulla.
+
 ## 8. Duplicati: fingerprint
 
+Con identificativo della fonte (es. `transaction_id` di Trade Republic):
+`sha256("ext" | fonte | id)`. Altrimenti:
 `sha256(account_id | booked_on | amount_cents | normalizedDescription | n)`
 dove `n` è l'indice di occorrenza della stessa quaterna *nello stesso file*.
 Così due caffè identici nello stesso giorno restano due righe distinte

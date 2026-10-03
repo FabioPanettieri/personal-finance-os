@@ -29,8 +29,9 @@
 
 ## Regole
 
-- Fixture CSV sintetiche in `tests/fixtures/csv/`, con intestazioni realistiche
-  e dati inventati. Mai export reali nel repository.
+- Fixture CSV sintetiche in `tests/fixtures/csv/` (ING, Revolut, Trade Republic e
+  casi di duplicati), con intestazioni realistiche e dati inventati. Mai export
+  reali nel repository.
 - Funzioni pure testate con tabelle di casi (`it.each`).
 - Ogni bug corretto porta un test di regressione che fallisce prima della fix.
 - La CI (GitHub Actions) esegue: install → typecheck → lint → unit → db test → build → E2E.

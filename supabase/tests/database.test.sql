@@ -293,6 +293,19 @@ select tests.throws(
   $$insert into storage.objects (bucket_id, name) values ('imports', 'revolut.csv')$$,
   '42501', 'storage: file fuori dalla cartella utente rifiutato');
 
+-- Importazioni (Sprint 3): A crea import, file e riga di staging ---------------
+
+insert into public.imports (account_id, bank_profile, status) values (:'a_ing', 'ing', 'preview');
+select id as a_import from public.imports limit 1 \gset
+insert into public.import_files (import_id, storage_path, original_filename, size_bytes, sha256)
+values (:'a_import', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/x/y.csv', 'ing.csv', 10, repeat('a', 64));
+insert into public.import_rows (import_id, row_index, raw, status, fingerprint)
+values (:'a_import', 0, '{"Data":"01/10/2026"}', 'new', tests.fp('row-0'));
+select tests.ok((select count(*) from public.import_rows) = 1, 'import: A legge le proprie righe di staging');
+select tests.throws(
+  format($$insert into public.import_rows (import_id, row_index, raw, status, errors) values (%L, 1, '{}', 'invalid', '[]')$$, :'a_import'),
+  '23514', 'import: una riga non valida deve avere almeno un errore');
+
 -- =============================================================================
 -- MFA obbligatoria (migration 0005): stessa utente A, sessione AAL1
 -- =============================================================================
@@ -402,6 +415,17 @@ set role authenticated;
 select tests.login('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'aal2');
 select tests.ok((select count(*) from storage.objects) = 0, 'storage: B non vede i file di A');
 select tests.ok((select count(*) from public.transactions) = 1, 'RLS: B vede solo la propria transazione');
+
+-- Importazioni (Sprint 3) -------------------------------------------------------
+
+select tests.ok((select count(*) from public.imports where id = :'a_import') = 0, 'import: B non vede le importazioni di A');
+select tests.ok((select count(*) from public.import_files where import_id = :'a_import') = 0, 'import: B non vede i file di A');
+select tests.ok((select count(*) from public.import_rows where import_id = :'a_import') = 0, 'import: B non vede le righe di A');
+select tests.throws(
+  format($$insert into public.import_rows (import_id, row_index, raw) values (%L, 5, '{}')$$, :'a_import'),
+  '23503', 'import: B non può aggiungere righe all''importazione di A');
+with attempted as (update public.imports set status = 'cancelled' where id = :'a_import' returning id)
+select tests.ok((select count(*) from attempted) = 0, 'import: B non può modificare l''importazione di A');
 
 -- Account (Sprint 2) ------------------------------------------------------------
 

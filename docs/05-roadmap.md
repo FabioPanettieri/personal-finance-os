@@ -174,3 +174,27 @@ report "SPRINT X — COMPLETED" qui sotto.
   per le tabelle future; controprova senza migration: i test AAL1 falliscono
 - Login, configurazione e verifica TOTP, logout, sessione persistente e conti
   verificati in E2E sullo stack reale
+
+## SPRINT 3 — COMPLETED (solo fixture sintetiche)
+
+**Implemented**
+- Pipeline: validazione file → riconoscimento fonte → parsing → mapping →
+  normalizzazione → duplicati → classificazione → trasferimenti → anteprima →
+  conferma → scrittura. Nessuna scrittura durante il parsing.
+- Importer specifici con interfaccia comune `CsvImporter` e modello
+  `NormalizedTransaction`: `INGImporter`, `RevolutImporter`, `TradeRepublicImporter`.
+- Classificazione con regole configurabili (DB + pacchetto predefinito come
+  dati), "Da verificare" quando nulla è abbastanza sicuro.
+- Deduplicazione: `transaction_id` della fonte quando presente, altrimenti
+  fingerprint con indice di occorrenza; possibili duplicati da confermare.
+- Rilevamento e collegamento dei trasferimenti (ING ↔ Revolut, Revolut → Trade Republic).
+- UI: storico, nuova importazione, anteprima con filtri, correzione, esclusione, conferma.
+- File originali nello Storage privato collegati a import / import_files / import_rows.
+
+**Database**: nessuna migration; schema Sprint 0 + 0005 (AAL2) invariato.
+
+**Tests**: unit 196, SQL 124 (Postgres temporaneo e Supabase locale),
+integrazione API 53, E2E mock 24, E2E Supabase reale 19 (1 saltato per scelta).
+
+**Prima dei dati reali**: confermare le intestazioni e la semantica di
+fee/tax/amount con export reali anonimizzati (solo intestazioni + righe inventate).

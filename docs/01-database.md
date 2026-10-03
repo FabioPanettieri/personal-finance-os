@@ -155,6 +155,20 @@ Due controlli impediscono che i tipi divergano dallo schema:
 migration) e il job CI `supabase-local`, che rigenera i tipi e fallisce se
 `git diff` non è vuoto.
 
+## Uso delle tabelle di import (Sprint 3, nessuna migration)
+
+- `imports.bank_profile` = fonte (`ing`, `revolut`, `trade_republic`); stato
+  `preview` → `committed` (o `cancelled`).
+- `import_files.header` conserva l'intestazione: alla conferma il mapping viene
+  ricalcolato in modo deterministico e ogni riga è rinormalizzata da `raw`.
+- `import_rows`: una riga per riga CSV. `status` = `new` (da importare),
+  `duplicate`, `possible_duplicate`, `invalid`, `skipped` (esclusa dall'importer
+  con motivo in `errors`, o dall'utente), `imported`. "Da verificare" è
+  derivato: nessun `proposed_type`, o confidenza < 0,6 non confermata a mano.
+- `transactions.fingerprint` / `investment_transactions.fingerprint`: chiave di
+  deduplicazione (identificativo della fonte o hash con indice di occorrenza).
+- `instruments` creati per ISIN alla conferma (`unique (user_id, isin)`).
+
 ## Lettura dei movimenti
 
 PostgREST restituisce al massimo 1000 righe per richiesta (`max_rows`) e tronca
