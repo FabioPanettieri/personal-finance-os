@@ -80,3 +80,21 @@ reali, lingua `it`.
 
 Interruttore "nascondi importi" (scorciatoia `H`): `Money` sostituisce le cifre
 con `••••` — utile mostrando l'app in pubblico.
+
+## Implementazione (Sprint 1)
+
+- Token in `app/globals.css`: variabili CSS su `:root` / `[data-theme='dark']`,
+  esposte a Tailwind 4 con `@theme inline` (`bg-surface`, `text-fg-muted`,
+  `text-positive`…). Variante `dark:` legata a `data-theme`.
+- Tema: preferenza automatica/chiara/scura in `localStorage`, applicata prima
+  del primo paint da uno script inline autorizzato dal nonce CSP.
+- Font Inter Variable servito localmente (`@fontsource-variable/inter`): nessuna
+  richiesta a Google Fonts.
+- Importi: separatore delle migliaia sempre presente (`useGrouping: 'always'`),
+  perché CLDR it-IT non raggruppa i numeri a 4 cifre ("1234,56").
+- Primitivi in `components/ui`: `Button`, `Card`/`CardHeader`, `Badge`, `Field`,
+  `Money`, `DeltaBadge`, `KpiCard`, `Skeleton`, `Spinner`, `EmptyState`,
+  `ErrorState`, `PageHeader`. Layout in `components/layout`: `AppShell`,
+  `Sidebar`, `BottomNav`, `ThemeToggle`, `UserBadge`, `SignOutButton`, `ComingSoon`.
+- Stati: `loading.tsx` (skeleton), `error.tsx` (con Riprova e riferimento
+  opaco), `not-found.tsx`, `global-error.tsx`; "—" indica assenza di dati, mai zero.

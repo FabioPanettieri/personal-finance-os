@@ -1,10 +1,17 @@
 node_modules/
 .next/
+.next-e2e/
 out/
 coverage/
+next-env.d.ts
+*.tsbuildinfo
 .env*
 !.env.example
 *.log
 .DS_Store
 /supabase/.temp/
+/supabase/.branches/
 /tests/fixtures/private/
+/test-results/
+/playwright-report/
+/tests/e2e/screenshots/

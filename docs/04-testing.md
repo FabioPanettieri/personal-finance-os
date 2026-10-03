@@ -5,7 +5,7 @@
 | Database | Suite SQL su PostgreSQL reale (`scripts/db-test-local.sh`) | RLS, isolamento utenti, vincoli, trigger, audit, storage | Ogni migration, CI |
 | Unit | Vitest | `lib/*`: money, dates, csv, imports, transfers, categorization, analytics | Ogni modifica, CI |
 | Integration | Vitest + Supabase locale | Server actions/repository: import end-to-end, commit idempotente | Sprint 3+, CI |
-| E2E | Playwright (Chromium preinstallato) | Login, import wizard, explorer, dashboard su mobile e desktop | Sprint 12, prima dei rilasci |
+| E2E | Playwright su build di produzione + finto Supabase Auth (`tests/e2e/mock-supabase.mjs`) | Protezione route, login, MFA, persistenza sessione, logout, header di sicurezza, CSP, layout desktop/mobile, tema | Dallo Sprint 1, CI |
 | Statico | `tsc --noEmit`, ESLint, Prettier | 0 errori, nessun `any` non motivato | Ogni commit |
 
 ## Casi obbligatori (specifica §42)
@@ -33,4 +33,21 @@
   e dati inventati. Mai export reali nel repository.
 - Funzioni pure testate con tabelle di casi (`it.each`).
 - Ogni bug corretto porta un test di regressione che fallisce prima della fix.
-- La CI (GitHub Actions) esegue: install → typecheck → lint → unit → db test → build.
+- La CI (GitHub Actions) esegue: install → typecheck → lint → unit → db test → build → E2E.
+
+## Comandi
+
+| Comando | Cosa fa |
+|---|---|
+| `npm run typecheck` | `next typegen` + `tsc --noEmit` |
+| `npm run lint` | ESLint, zero warning ammessi |
+| `npm test` | Vitest (unit + componenti), processo in fuso `America/Los_Angeles` per far emergere slittamenti di data |
+| `npm run test:db` | Migration + suite SQL su PostgreSQL temporaneo |
+| `npm run test:e2e` | Build in `.next-e2e` collegata al finto Supabase, poi Playwright desktop + mobile (`PLAYWRIGHT_CHROMIUM_PATH` per usare un Chromium già installato) |
+| `npm run check` | Tutto quanto sopra, in ordine |
+
+Il finto Supabase implementa solo l'API GoTrue usata dall'app (password,
+refresh, utente, TOTP, logout) con JWT HS256 reali e un utente fittizio: il
+codice applicativo (`@supabase/ssr`, `getClaims`, proxy, layout) è quello di
+produzione. Non sostituisce la verifica contro un progetto Supabase reale,
+prevista quando il progetto verrà collegato.

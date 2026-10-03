@@ -55,3 +55,56 @@ report "SPRINT X — COMPLETED" qui sotto.
 - `pg_trgm` è creato nello schema `extensions` (convenzione Supabase).
 
 **Next sprint**: Sprint 1 — Foundation.
+
+## SPRINT 1 — COMPLETED
+
+**Implemented**
+- Progetto Next.js 16.3 (App Router, Turbopack) + React 19.3 + TypeScript 6.0
+  strict (`noUncheckedIndexedAccess`) + Tailwind CSS 4.3
+- Integrazione Supabase reale via `@supabase/ssr`: client server legato ai
+  cookie, `proxy.ts` che rinnova la sessione, configurazione da variabili
+  d'ambiente validate (`lib/env.ts`), `.env.example` documentato, nessuna chiave
+- Auth: login, logout, sessione persistente, TOTP obbligatorio (setup + verify),
+  protezione route a doppia barriera (proxy + layout), redirect sicuro con `next`
+- Security: CSP con nonce per richiesta, header di sicurezza, fail closed senza
+  configurazione, regola ESLint che vieta `signUp`
+- Design system: token light/dark, tema persistente senza flash, 12 primitivi
+  UI, `Money` con centesimi interi
+- Layout responsive: sidebar desktop, top bar + bottom navigation mobile
+  (5 voci, target ≥ 44 px, safe area iOS), skip link
+- Routing iniziale: Home, Transazioni, Patrimonio, Analytics, Impostazioni (+
+  Sicurezza), Conti, Investimenti, Report, Obiettivi, Importazioni
+- Stati: loading (skeleton), error (Riprova), empty, not-found, global-error
+- Librerie pure: `lib/money` (Cents), `lib/dates` (IsoDate, Europe/Rome),
+  `lib/auth/access`, `lib/security/csp`, `lib/navigation`, `lib/theme`
+- CI GitHub Actions: typecheck → lint → unit → DB → build → E2E
+- `supabase/config.toml` per la CLI locale (signup off, TOTP on)
+
+**Database**
+- Nessuna nuova migration: le 4 migration dello Sprint 0 sono invariate.
+- L'app legge solo `profiles` (creato dal trigger di signup dello Sprint 0).
+- `types/database.ts` è un sottoinsieme scritto a mano (solo `profiles`), da
+  sostituire con `supabase gen types` allo Sprint 2.
+
+**Tests**
+- Unit + componenti (Vitest): 76 passed, 0 failed
+- Database (Sprint 0, regressione): 59 passed, 0 failed
+- E2E (Playwright, desktop + mobile): 22 passed, 0 failed
+
+**TypeScript**: PASS · **Lint**: PASS (0 warning) · **Build**: PASS
+
+**Bug trovati e corretti durante lo sprint**
+- Importi a 4 cifre senza separatore ("1234,56 €", regola CLDR it-IT). Fix:
+  `useGrouping: 'always'`. Test di regressione: `5.200,00 €`.
+- Dopo il login l'URL restava `/` mentre la pagina mostrava la configurazione
+  TOTP, e l'azione successiva falliva (doppio redirect durante il render di una
+  Server Action). Fix: il login reindirizza direttamente al passaggio MFA
+  corretto, propagando `next`. Test E2E dedicati.
+
+**Known issues**
+- Login e MFA sono verificati contro un finto Supabase Auth: la prova contro un
+  progetto reale avverrà quando verrà collegato.
+- `types/database.ts` scritto a mano (vedi sopra).
+- La PWA (manifest, service worker) resta allo Sprint 12, come da piano.
+
+**Next sprint**: Sprint 2 — Accounts.

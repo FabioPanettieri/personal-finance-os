@@ -10,7 +10,7 @@ corretta → analytics corrette → UI eccellente**.
 | Livello | Scelta | Motivo |
 |---|---|---|
 | Framework | Next.js 16 (App Router, RSC, Server Actions), React 19 | Rendering server-side dei dati sensibili, niente API pubblica da esporre |
-| Linguaggio | TypeScript `strict` + `noUncheckedIndexedAccess` | Zero `any`, tipi DB generati |
+| Linguaggio | TypeScript 6.0 `strict` + `noUncheckedIndexedAccess` | Zero `any`, tipi DB generati. TS 7 escluso finché typescript-eslint non lo supporta (`<6.1`) |
 | DB / Auth / Storage | Supabase (PostgreSQL 15+, Auth, Storage, RLS) | RLS come ultima linea di difesa |
 | Hosting | Vercel (regione `fra1`, vicina al progetto Supabase EU) | Deploy Next.js nativo |
 | Styling | Tailwind CSS 4 + design tokens CSS (`@theme`) | Dark/light via variabili |
@@ -21,13 +21,14 @@ corretta → analytics corrette → UI eccellente**.
 | Denaro | Interi in centesimi (`bigint` DB ↔ `number` safe-integer TS, tipo brand `Cents`) | Nessun float nei calcoli |
 | Quantità titoli | `numeric` DB ↔ `decimal.js` TS | Frazioni di ETF dei PAC |
 | Date | `date` DB ↔ stringa `YYYY-MM-DD` brand `IsoDate` in TS; fuso `Europe/Rome` esplicito | Nessuna conversione implicita UTC |
-| Test | Vitest (unit/integration), suite SQL su Postgres reale (RLS), Playwright (E2E, Sprint 12) | |
+| Test | Vitest (unit/integration), suite SQL su Postgres reale (RLS), Playwright (E2E contro build di produzione + finto Supabase Auth) | |
 | PWA | Serwist (`@serwist/next`) | Service worker senza cache dei dati finanziari |
 
 Versioni verificate su npm il 03/10/2026: next 16.3, react 19.3, tailwindcss
 4.3, @supabase/ssr 0.12, @supabase/supabase-js 2.117, zod 4.6, vitest 5.0,
-recharts 3.10, papaparse 5.7, decimal.js 10.6, @serwist/next 9.5. Saranno
-fissate nel `package-lock.json` allo Sprint 1.
+recharts 3.10, papaparse 5.7, decimal.js 10.6, @serwist/next 9.5. Dallo
+Sprint 1 le versioni installate sono fissate nel `package-lock.json`
+(ESLint resta alla 9: `eslint-plugin-react` non supporta ancora la 10).
 
 ## 2. Principi architetturali
 
@@ -87,6 +88,7 @@ Movimenti tra conti propri:
 personal-finance-os/
 ├─ app/                              # Routing Next.js (solo composizione)
 │  ├─ (auth)/login/                  # Login (nessuna registrazione pubblica)
+│  ├─ (auth)/mfa/{setup,verify}/     # TOTP obbligatorio
 │  ├─ (app)/                         # Area autenticata, layout con nav
 │  │  ├─ page.tsx                    # Dashboard
 │  │  ├─ transactions/
@@ -115,7 +117,8 @@ personal-finance-os/
 │  ├─ analytics/                     # calculateTotalIncome() … calculateAnnualReport()
 │  └─ insights/                      # Testi insight settimanali derivati dai dati
 ├─ server/                           # Solo server ('server-only')
-│  ├─ supabase/                      # createServerClient, middleware session
+│  ├─ supabase/                      # client server (cookie), resolveSession (getClaims + AAL)
+│  ├─ auth/                          # getAuth, requireUser, requireSession, getProfile
 │  ├─ repositories/                  # Accesso dati tipizzato per tabella/aggregato
 │  └─ services/                      # Orchestrazione (commitImport, rebuildSnapshots)
 ├─ hooks/                            # Hook React condivisi (useMediaQuery, useTheme…)
@@ -142,12 +145,15 @@ progetto se non `lib`; `components/ui` non importa `features` né `server`.
 
 ## 5. Route Map
 
-Tutte le route sotto `(app)` richiedono sessione; il middleware rinnova la
+Tutte le route sotto `(app)` richiedono sessione AAL2. In Next.js 16 il
+middleware si chiama **proxy** (`proxy.ts`): genera il nonce CSP, rinnova la
 sessione e reindirizza a `/login`.
 
 | Route | Pagina | Sprint |
 |---|---|---|
-| `/login` | Accesso email + password (+ TOTP) | 1 |
+| `/login` | Accesso email + password | 1 |
+| `/mfa/setup` | Configurazione TOTP (obbligatoria al primo accesso) | 1 |
+| `/mfa/verify` | Codice TOTP a ogni nuovo accesso | 1 |
 | `/` | Dashboard: patrimonio, KPI, cash flow, entrate/spese | 6 |
 | `/transactions` | Transaction Explorer (filtri in query string) | 4 |
 | `/transactions/[id]` | Dettaglio/modifica (drawer su desktop, pagina su mobile) | 4 |

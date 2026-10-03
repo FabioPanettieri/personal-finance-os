@@ -15,11 +15,29 @@ Ogni livello presume che quello sopra possa fallire.
 | Manomissione dei dati originali | Trigger di immutabilità su `original_description`, `fingerprint`, conto, sorgente; audit log append-only |
 | CSV malevolo | Limite 10 MB / 50.000 righe, MIME e estensione verificati, decodifica esplicita, nessuna `eval`, celle trattate come testo, regex utente limitate a 200 caratteri; neutralizzazione di `= + - @` all'esportazione (CSV injection) |
 | File caricati leggibili da altri | Bucket `imports` privato, policy per cartella `{uid}/…`, nessuna policy di update |
-| XSS / clickjacking | React escaping, CSP restrittiva (`default-src 'self'`, connect solo verso Supabase), `frame-ancestors 'none'`, `X-Content-Type-Options`, `Referrer-Policy: no-referrer` |
+| XSS / clickjacking | React escaping, CSP con nonce per richiesta (`script-src 'nonce-…' 'strict-dynamic'`, `default-src 'self'`, connect solo verso Supabase), `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, HSTS. `style-src` ammette `'unsafe-inline'` (attributi style di React/Next): gli script restano bloccati |
 | CSRF sulle server action | Cookie `SameSite=Lax` + controllo `Origin` nativo delle Server Actions |
 | Dati sensibili in cache del browser/PWA | Il service worker non mette in cache risposte con dati; `Cache-Control: private, no-store` sulle pagine autenticate |
 | Dati inviati a servizi AI | Opt-in esplicito; solo descrizione normalizzata e segno importo; IBAN e numeri carta mascherati prima dell'invio |
 | Log con dati finanziari | Logger server con redazione di importi/descrizioni; nessun dato finanziario nei messaggi d'errore mostrati |
+
+## Autenticazione (implementata nello Sprint 1)
+
+| Aspetto | Implementazione |
+|---|---|
+| Login | Email + password via Server Action (`features/auth/actions.ts`), validazione Zod, messaggio d'errore generico, 429 gestito |
+| Registrazione | Assente: nessuna pagina, nessuna chiamata `signUp` (vietata da una regola ESLint), `enable_signup = false` in `supabase/config.toml`; sul progetto cloud va disattivato "Allow new users to sign up" |
+| MFA | TOTP obbligatorio: senza fattore → `/mfa/setup` (QR + chiave), con fattore e sessione AAL1 → `/mfa/verify`. L'area app richiede AAL2 |
+| Verifica identità | `getClaims()` verifica la firma del JWT (o interroga Supabase Auth con chiavi simmetriche). Il livello AAL viene dal claim verificato; i dati non verificati della sessione decidono solo *dove* reindirizzare, mai se concedere accesso |
+| Sessione persistente | Cookie gestiti da `@supabase/ssr`; `proxy.ts` rinnova il token a ogni navigazione e riscrive i cookie |
+| Protezione route | Doppia barriera: `proxy.ts` (regole pure in `lib/auth/access.ts`) e `requireUser()` nel layout `(app)` e nelle pagine sensibili. Le richieste di prefetch saltano il proxy ma non il layout |
+| Supabase non configurato | Fail closed: nessuna pagina protetta raggiungibile, il login mostra l'avviso con le variabili mancanti |
+| Redirect dopo login | `next` accettato solo se percorso interno dell'area app (`safeNextPath`): niente open redirect, preservato attraverso il passaggio MFA |
+| Logout | Server Action `signOut({ scope: 'local' })` → `/login` |
+
+Creazione del proprietario (una tantum): Supabase Dashboard → Authentication →
+Users → *Add user* (oppure Studio locale con `supabase start`). Al primo
+accesso l'app impone la configurazione del TOTP.
 
 ## Cosa l'app NON fa (per scelta)
 
@@ -43,7 +61,7 @@ migration e lancia `supabase/tests/database.test.sql` impersonando due utenti
 isolata, inserimento con `user_id` altrui, riferimento a righe altrui tramite
 FK, update/delete su righe altrui, cambio di proprietario, funzioni
 privilegiate, audit, storage, anonimo. Dallo Sprint 1 la stessa suite gira in
-CI (GitHub Actions) a ogni push.
+CI (GitHub Actions, `.github/workflows/ci.yml`) a ogni push.
 
 ## Segreti e ambienti
 

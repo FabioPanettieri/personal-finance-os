@@ -1,0 +1,41 @@
+# Configurazione per la Supabase CLI locale (`supabase start`).
+# Riporta le scelte del Security Model (docs/02-security.md); le chiavi non
+# indicate usano i default della CLI. Per il progetto cloud le stesse
+# impostazioni vanno applicate dalla Dashboard (Authentication → Sign In / Providers, MFA).
+
+project_id = "personal-finance-os"
+
+[api]
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[auth]
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+# Nessuna registrazione pubblica: l'utente proprietario si crea da Studio/Dashboard.
+enable_signup = false
+enable_anonymous_sign_ins = false
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+minimum_password_length = 12
+password_requirements = "lower_upper_letters_digits"
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[storage]
+file_size_limit = "10MiB"
