@@ -199,8 +199,20 @@ const server = createServer(async (req, res) => {
       return send(res, 200, single ? row : [row])
     }
 
-    // Conti: nessun conto (stato vuoto). I conti reali si testano in tests/e2e/local.
-    if (req.method === 'GET' && (path === '/rest/v1/accounts' || path === '/rest/v1/account_balances' || path === '/rest/v1/imports')) {
+    // Dati finanziari: utente senza dati (stato vuoto). Conti, movimenti e
+    // dashboard reali si testano in tests/e2e/local contro Supabase locale.
+    const EMPTY_TABLES = ['accounts', 'account_balances', 'imports', 'import_rows', 'transactions', 'transaction_categories', 'businesses', 'income_sources', 'investment_transactions']
+    if ((req.method === 'GET' || req.method === 'HEAD') && EMPTY_TABLES.some((t) => path === `/rest/v1/${t}`)) {
+      if (!claims) return send(res, 401, { message: 'JWT required' })
+      if (req.method === 'HEAD') {
+        res.writeHead(200, { 'content-range': '*/0' })
+        return res.end()
+      }
+      res.setHeader('content-range', '*/0')
+      return send(res, 200, [])
+    }
+    // Funzioni di aggregazione della dashboard: nessuna riga.
+    if (req.method === 'POST' && path.startsWith('/rest/v1/rpc/')) {
       if (!claims) return send(res, 401, { message: 'JWT required' })
       return send(res, 200, [])
     }

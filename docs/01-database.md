@@ -188,6 +188,16 @@ le nuove colonne):
   come dati. Chiamata dal trigger di registrazione e una volta per gli utenti
   esistenti; idempotente (per nome).
 
+## Migration 0007 — aggregati della dashboard (Sprint 4)
+
+Solo funzioni di lettura, nessuna tabella e nessuna metrica salvata:
+`dashboard_monthly_flows`, `dashboard_category_spending`,
+`dashboard_income_by_source`, `dashboard_business_performance`,
+`dashboard_account_changes`, `dashboard_invested_at_cost`, `net_worth_history`.
+Tutte `SECURITY INVOKER` (RLS + AAL2 invariati), `STABLE`, `search_path = ''`,
+eseguibili solo da `authenticated`. Stessa finestra del saldo iniziale di
+`account_balances`. Formule in `docs/07-dashboard.md`.
+
 ## Lettura dei movimenti
 
 PostgREST restituisce al massimo 1000 righe per richiesta (`max_rows`) e tronca

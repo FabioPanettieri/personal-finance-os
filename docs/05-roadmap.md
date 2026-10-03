@@ -221,3 +221,23 @@ Dettagli: `docs/06-import-real-formats.md`.
 **Database**: migration 0006 (estensione minima, nessuna nuova tabella).
 
 **Non fatto (deciso)**: parser PDF Trade Republic — solo architettura e TODO.
+
+## SPRINT 4 — COMPLETED (Financial Dashboard)
+
+Su richiesta, lo Sprint 4 è diventato la dashboard (anticipando parte dello
+Sprint 6 della tabella); l'explorer completo delle transazioni (modifica, bulk)
+resta da fare. Dettagli: `docs/07-dashboard.md`.
+
+**Implemented**
+- `/`: patrimonio netto, liquidità, entrate, uscite, cash flow; selettore di
+  periodo (8 preset, personalizzato) con confronto neutro; grafico del
+  patrimonio (30g/90g/6m/1a/tutto); cash flow mensile cliccabile; spese per
+  categoria; fonti di reddito; attività (ricavi, spese, utile, margine);
+  conti; attività recenti; "Da verificare"; ultimo import.
+- `/transactions`: lista con filtri nell'URL (periodo, tipo, conto, categoria,
+  business, fonte, da verificare, ricerca), paginata.
+- `/transactions/[id]`: dettaglio (IBAN controparte mascherato, gambe del
+  trasferimento, origine) e conferma della classificazione.
+- Token colore dei grafici validati per daltonismo in light e dark.
+
+**Database**: migration 0007 (solo funzioni SECURITY INVOKER, nessuna tabella).

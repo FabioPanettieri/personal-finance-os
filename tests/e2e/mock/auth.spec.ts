@@ -99,7 +99,7 @@ test('primo accesso: login → configurazione TOTP obbligatoria → dashboard, s
 
   await expect(page).toHaveURL('/')
   await expect(page.getByRole('heading', { name: 'Home', level: 1 })).toBeVisible()
-  await expect(page.getByText('Patrimonio totale')).toBeVisible()
+  await expect(page.getByText('Patrimonio netto')).toBeVisible()
 
   // Persistenza: ricarica e nuova scheda restano autenticate.
   await page.reload()

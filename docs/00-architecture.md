@@ -308,6 +308,14 @@ Scelte principali:
 - **Conferma idempotente**: ogni inserimento usa `upsert … ignoreDuplicates` su
   `(account_id, fingerprint)`; un nuovo tentativo dopo un errore non duplica nulla.
 
+## 7.5 Dashboard (Sprint 4)
+
+Vista sui dati, nessuna metrica salvata: saldi da `account_balances`, flussi e
+ripartizioni dalle funzioni SQL della migration 0007 (SECURITY INVOKER), logica
+pura in `lib/dashboard`. Trasferimenti e versamenti agli investimenti non sono
+mai entrate o uscite; il broker è separato in liquidità e investimenti al costo.
+Dettagli e formule: `docs/07-dashboard.md`.
+
 ## 8. Duplicati: fingerprint
 
 Con identificativo della fonte (es. `transaction_id` di Trade Republic):

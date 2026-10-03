@@ -26,6 +26,9 @@
   --warning: #b7791f;
   --warning-soft: #fdf3e2;
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04);
+  /* Serie dei grafici (identità, non stato): validate per daltonismo, light. */
+  --chart-income: #4f5bd5;
+  --chart-expense: #e8853b;
 }
 
 [data-theme='dark'] {
@@ -48,6 +51,9 @@
   --warning: #f5b544;
   --warning-soft: #33260f;
   --shadow-card: none;
+  /* Stesse serie, gradini per la superficie scura (validate separatamente). */
+  --chart-income: #7c86f0;
+  --chart-expense: #cf7230;
 }
 
 @theme inline {
@@ -68,6 +74,8 @@
   --color-negative-soft: var(--negative-soft);
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
+  --color-chart-income: var(--chart-income);
+  --color-chart-expense: var(--chart-expense);
 
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;

@@ -1583,6 +1583,70 @@ export type Database = {
     }
     Functions: {
       category_id_by_path: { Args: { p_path: string; p_user_id: string }; Returns: string }
+      dashboard_account_changes: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          account_id: string
+          change_cents: number
+          tx_count: number
+        }[]
+      }
+      dashboard_business_performance: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          business_id: string
+          currency: string
+          expense_cents: number
+          revenue_cents: number
+          tx_count: number
+        }[]
+      }
+      dashboard_category_spending: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          category_id: string
+          currency: string
+          spent_cents: number
+          tx_count: number
+        }[]
+      }
+      dashboard_income_by_source: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          currency: string
+          income_cents: number
+          income_source_id: string
+          tx_count: number
+        }[]
+      }
+      dashboard_invested_at_cost: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          account_id: string
+          invested_cents: number
+          trade_count: number
+        }[]
+      }
+      dashboard_monthly_flows: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          currency: string
+          expense_cents: number
+          expense_count: number
+          income_cents: number
+          income_count: number
+          month: string
+          refund_cents: number
+        }[]
+      }
+      net_worth_history: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          currency: string
+          day: string
+          total_cents: number
+        }[]
+      }
       seed_default_data: { Args: { p_user_id: string }; Returns: undefined }
       seed_import_defaults: { Args: { p_user_id: string }; Returns: undefined }
     }

@@ -476,6 +476,35 @@ select tests.ok((select not public from storage.buckets where id = 'imports'), '
 
 set role authenticated;
 select tests.login('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'aal2');
+
+-- Aggregati della dashboard (0007): SECURITY INVOKER → RLS + AAL2 come una SELECT
+select tests.ok(
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname in ('dashboard_monthly_flows', 'dashboard_category_spending', 'dashboard_income_by_source',
+     'dashboard_business_performance', 'dashboard_account_changes', 'dashboard_invested_at_cost', 'net_worth_history')
+     and not p.prosecdef and p.provolatile = 's') = 7,
+  '0007: 7 funzioni di aggregazione, tutte SECURITY INVOKER e STABLE');
+select tests.ok(
+  not has_function_privilege('anon', 'public.net_worth_history()', 'execute')
+    and not has_function_privilege('anon', 'public.dashboard_monthly_flows(date, date)', 'execute')
+    and has_function_privilege('authenticated', 'public.dashboard_monthly_flows(date, date)', 'execute'),
+  '0007: funzioni eseguibili solo da utenti autenticati');
+select tests.ok(
+  (select income_cents = 250000 and expense_cents = 0 from public.dashboard_monthly_flows('2026-09-01', '2026-09-30')) and
+  (select count(*) from public.dashboard_monthly_flows('2000-01-01', '2100-12-31')) = 1,
+  '0007: B vede solo i propri flussi (A ha movimenti nello stesso periodo)');
+select tests.ok(
+  (select count(*) from public.net_worth_history()) = 1 and (select total_cents from public.net_worth_history()) = 250000,
+  '0007: storico patrimonio di B calcolato solo sui suoi conti');
+select tests.ok(
+  (select count(*) from public.dashboard_account_changes('2000-01-01', '2100-12-31') c
+   where c.account_id in (select id from public.accounts where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')) = 0,
+  '0007: nessuna variazione dei conti di A visibile a B');
+select tests.login('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'aal1');
+select tests.ok(
+  (select count(*) from public.dashboard_monthly_flows('2000-01-01', '2100-12-31')) = 0 and (select count(*) from public.net_worth_history()) = 0,
+  '0007: con sessione AAL1 gli aggregati sono vuoti');
+select tests.login('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'aal2');
 select tests.ok((select count(*) from storage.objects) = 0, 'storage: B non vede i file di A');
 select tests.ok((select count(*) from public.transactions) = 1, 'RLS: B vede solo la propria transazione');
 
