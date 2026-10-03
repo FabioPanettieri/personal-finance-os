@@ -49,6 +49,28 @@ language sql
 immutable
 as $$ select encode(sha256(convert_to(seed, 'UTF8')), 'hex') $$;
 
+-- Simula il JWT di una richiesta PostgREST: sub + livello di autenticazione.
+-- aal = null simula un token privo del claim (deve essere trattato come AAL1).
+create function tests.login(user_id uuid, aal text)
+returns void
+language sql
+as $$
+  select set_config('request.jwt.claim.sub', '', false);
+  select set_config(
+    'request.jwt.claims',
+    jsonb_strip_nulls(jsonb_build_object('sub', user_id, 'role', 'authenticated', 'aal', aal))::text,
+    false
+  );
+$$;
+
+create function tests.logout()
+returns void
+language sql
+as $$
+  select set_config('request.jwt.claim.sub', '', false);
+  select set_config('request.jwt.claims', '', false);
+$$;
+
 grant execute on all functions in schema tests to anon, authenticated;
 
 -- -----------------------------------------------------------------------------
@@ -84,11 +106,11 @@ select tests.ok(
   'bootstrap: fonti VOXEL e YouTube collegate ai rispettivi business');
 
 -- =============================================================================
--- Da qui in poi: sessione autenticata come utente A
+-- Da qui in poi: sessione autenticata come utente A, con TOTP verificato (AAL2)
 -- =============================================================================
 
 set role authenticated;
-select set_config('request.jwt.claim.sub', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', false);
+select tests.login('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'aal2');
 
 select id as a_ing from public.accounts where name = 'ING Direct' \gset
 select id as a_rev from public.accounts where name = 'Revolut' \gset
@@ -272,6 +294,95 @@ select tests.throws(
   '42501', 'storage: file fuori dalla cartella utente rifiutato');
 
 -- =============================================================================
+-- MFA obbligatoria (migration 0005): stessa utente A, sessione AAL1
+-- =============================================================================
+
+select tests.login('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'aal1');
+
+-- SELECT → negato (nessuna riga visibile, anche se esistono)
+select tests.ok((select count(*) from public.accounts) = 0, 'AAL1: SELECT accounts negato');
+select tests.ok((select count(*) from public.transactions) = 0, 'AAL1: SELECT transactions negato');
+select tests.ok((select count(*) from public.account_balances) = 0, 'AAL1: SELECT vista saldi negato');
+select tests.ok((select count(*) from public.transaction_categories) = 0, 'AAL1: SELECT categorie negato');
+select tests.ok((select count(*) from public.businesses) = 0, 'AAL1: SELECT businesses negato');
+select tests.ok((select count(*) from public.income_sources) = 0, 'AAL1: SELECT fonti di reddito negato');
+select tests.ok((select count(*) from public.transfer_groups) = 0, 'AAL1: SELECT gruppi di trasferimento negato');
+select tests.ok((select count(*) from public.categorization_rules) = 0, 'AAL1: SELECT regole negato');
+select tests.ok((select count(*) from public.investment_accounts) = 0, 'AAL1: SELECT conti investimento negato');
+select tests.ok((select count(*) from public.instruments) = 0, 'AAL1: SELECT strumenti negato');
+select tests.ok((select count(*) from public.profiles) = 0, 'AAL1: SELECT profilo negato');
+select tests.ok((select count(*) from public.audit_logs) = 0, 'AAL1: SELECT audit log negato');
+select tests.ok((select count(*) from storage.objects) = 0, 'AAL1: SELECT file importati negato');
+select tests.ok((select count(*) from public.account_types) = 7, 'AAL1: account_types (riferimento pubblico) resta leggibile');
+
+-- INSERT → negato
+select tests.throws(
+  format($$insert into public.transactions (account_id, booked_on, description, original_description, amount_cents, type, nature, fingerprint)
+           values (%L, '2026-09-30', 'x', 'x', -100, 'expense', 'personal', tests.fp('aal1-1'))$$, :'a_ing'),
+  '42501', 'AAL1: INSERT transactions negato');
+select tests.throws($$insert into public.accounts (name, account_type) values ('Conto AAL1', 'checking')$$, '42501', 'AAL1: INSERT accounts negato');
+select tests.throws($$insert into public.goals (name, target_amount_cents) values ('Obiettivo', 100000)$$, '42501', 'AAL1: INSERT goals negato');
+select tests.throws($$insert into public.budgets (name, starts_on) values ('Budget', '2026-10-01')$$, '42501', 'AAL1: INSERT budgets negato');
+select tests.throws(format($$insert into public.imports (account_id, bank_profile) values (%L, 'ing')$$, :'a_ing'), '42501', 'AAL1: INSERT imports negato');
+select tests.throws($$insert into public.instruments (name) values ('ETF')$$, '42501', 'AAL1: INSERT instruments negato');
+select tests.throws($$insert into public.businesses (name, slug) values ('Nuovo', 'nuovo')$$, '42501', 'AAL1: INSERT businesses negato');
+select tests.throws($$insert into public.income_sources (name) values ('Nuova fonte')$$, '42501', 'AAL1: INSERT income_sources negato');
+select tests.throws(
+  $$insert into public.net_worth_snapshots (snapshot_on, liquid_cents, invested_cents, total_cents) values ('2026-09-30', 1, 0, 1)$$,
+  '42501', 'AAL1: INSERT snapshot patrimonio negato');
+select tests.throws(
+  $$insert into storage.objects (bucket_id, name) values ('imports', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/imp-2/ing.csv')$$,
+  '42501', 'AAL1: upload CSV nella propria cartella negato');
+
+-- UPDATE → negato (nessuna riga raggiungibile)
+with attempted as (update public.accounts set name = 'Modificato in AAL1' returning id)
+select tests.ok((select count(*) from attempted) = 0, 'AAL1: UPDATE accounts negato');
+with attempted as (update public.transactions set notes = 'AAL1' returning id)
+select tests.ok((select count(*) from attempted) = 0, 'AAL1: UPDATE transactions negato');
+with attempted as (update public.profiles set display_name = 'AAL1' returning id)
+select tests.ok((select count(*) from attempted) = 0, 'AAL1: UPDATE profilo negato');
+
+-- DELETE → negato
+with attempted as (delete from public.transactions returning id)
+select tests.ok((select count(*) from attempted) = 0, 'AAL1: DELETE transactions negato');
+with attempted as (delete from public.categorization_rules returning id)
+select tests.ok((select count(*) from attempted) = 0, 'AAL1: DELETE regole negato');
+-- (DELETE su storage.objects: Supabase vieta del tutto le delete SQL dirette;
+-- il caso AAL1 è verificato tramite l'API Storage in tests/integration/aal.test.ts.)
+
+-- Token senza claim aal: trattato come AAL1
+select tests.login('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', null);
+select tests.ok((select count(*) from public.accounts) = 0, 'token senza claim aal: SELECT negato');
+select tests.throws($$insert into public.goals (name, target_amount_cents) values ('x', 1)$$, '42501', 'token senza claim aal: INSERT negato');
+
+-- =============================================================================
+-- Stessa utente, di nuovo AAL2: CRUD consentito e dati intatti
+-- =============================================================================
+
+select tests.login('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'aal2');
+
+select tests.ok((select count(*) from public.accounts) = 3, 'AAL2: SELECT accounts consentito, nessun conto alterato');
+select tests.ok((select count(*) from public.transactions) = 4, 'AAL2: SELECT transactions consentito, nessuna riga persa');
+select tests.ok((select count(*) from public.profiles) = 1, 'AAL2: SELECT profilo consentito');
+select tests.ok(
+  (select count(*) from public.accounts where name = 'Modificato in AAL1') = 0,
+  'AAL2: l''UPDATE tentato in AAL1 non ha avuto effetto');
+
+insert into public.goals (name, target_amount_cents) values ('Fondo emergenza', 1000000);
+select tests.ok((select count(*) from public.goals) = 1, 'AAL2: INSERT goals consentito');
+with changed as (update public.goals set current_amount_cents = 250000 where name = 'Fondo emergenza' returning id)
+select tests.ok((select count(*) from changed) = 1, 'AAL2: UPDATE goals consentito');
+with removed as (delete from public.goals where name = 'Fondo emergenza' returning id)
+select tests.ok((select count(*) from removed) = 1, 'AAL2: DELETE goals consentito');
+
+insert into public.transactions (account_id, booked_on, description, original_description, amount_cents, type, nature, fingerprint)
+values (:'a_rev', '2026-09-30', 'Caffè', 'BAR', -150, 'expense', 'personal', tests.fp('aal2-1'));
+with changed as (update public.transactions set notes = 'ok' where fingerprint = tests.fp('aal2-1') returning id)
+select tests.ok((select count(*) from changed) = 1, 'AAL2: INSERT e UPDATE transactions consentiti');
+with removed as (delete from public.transactions where fingerprint = tests.fp('aal2-1') returning id)
+select tests.ok((select count(*) from removed) = 1, 'AAL2: DELETE transactions consentito');
+
+-- =============================================================================
 -- Verifiche lato superuser su ciò che A ha tentato
 -- =============================================================================
 
@@ -288,7 +399,7 @@ select tests.ok((select not public from storage.buckets where id = 'imports'), '
 -- Storage visto da B -----------------------------------------------------------
 
 set role authenticated;
-select set_config('request.jwt.claim.sub', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', false);
+select tests.login('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'aal2');
 select tests.ok((select count(*) from storage.objects) = 0, 'storage: B non vede i file di A');
 select tests.ok((select count(*) from public.transactions) = 1, 'RLS: B vede solo la propria transazione');
 
@@ -322,7 +433,7 @@ select tests.throws(
 
 reset role;
 set role anon;
-select set_config('request.jwt.claim.sub', '', false);
+select tests.logout();
 select tests.throws($$select count(*) from public.accounts$$, '42501', 'anon: nessun accesso ai conti');
 select tests.throws($$select count(*) from public.transactions$$, '42501', 'anon: nessun accesso alle transazioni');
 select tests.throws($$select count(*) from public.profiles$$, '42501', 'anon: nessun accesso ai profili');
@@ -355,3 +466,38 @@ delete from auth.users where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 select tests.ok(
   (select count(*) from public.accounts where user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') = 0,
   'cancellazione utente: tutti i dati rimossi in cascata');
+
+-- =============================================================================
+-- Copertura: ogni tabella con dati utente ha la policy AAL2 (anche le future)
+-- =============================================================================
+
+select tests.ok(
+  not exists (
+    select 1
+    from information_schema.columns c
+    join information_schema.tables t on t.table_schema = c.table_schema and t.table_name = c.table_name
+    where c.table_schema = 'public'
+      and t.table_type = 'BASE TABLE'
+      and (c.column_name = 'user_id' or c.table_name = 'profiles')
+      and not exists (
+        select 1 from pg_policies p
+        where p.schemaname = 'public'
+          and p.tablename = c.table_name
+          and p.permissive = 'RESTRICTIVE'
+          and p.cmd = 'ALL'
+          and p.roles = '{authenticated}'
+          and p.qual like '%aal2%'
+          and p.with_check like '%aal2%'
+      )
+  ),
+  'copertura: tutte le tabelle con dati utente richiedono AAL2');
+select tests.ok(
+  (select count(*) from pg_policies where schemaname = 'public' and policyname like '%_require_aal2') = 25,
+  'copertura: 25 tabelle protette da policy restrictive AAL2');
+select tests.ok(
+  not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'account_types' and qual like '%aal2%'),
+  'copertura: account_types (riferimento pubblico) non richiede AAL2');
+select tests.ok(
+  exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects'
+          and policyname = 'imports_bucket_require_aal2' and permissive = 'RESTRICTIVE'),
+  'copertura: il bucket imports richiede AAL2');

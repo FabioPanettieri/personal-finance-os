@@ -7,7 +7,7 @@ import { anonClient, createTestUser, deleteTestUser, type TestUser } from './hel
 let owner: TestUser
 
 beforeAll(async () => {
-  owner = await createTestUser('owner')
+  owner = await createTestUser('owner', 'aal1')
 })
 
 afterAll(async () => {

@@ -39,15 +39,41 @@ Creazione del proprietario (una tantum): Supabase Dashboard → Authentication �
 Users → *Add user* (oppure Studio locale con `supabase start`). Al primo
 accesso l'app impone la configurazione del TOTP.
 
-### Rischio aperto: MFA non imposta a livello di database
+### MFA imposta anche dal database (migration 0005)
 
-Le policy RLS verificano `user_id = auth.uid()` ma non il livello di
-autenticazione. Il TOTP è obbligatorio nell'app (proxy + layout), ma un token
-ottenuto con la sola password (AAL1) può interrogare direttamente l'API
-PostgREST con la publishable key e leggere i propri dati. Mitigazione proposta
-(richiede una migration, in attesa di approvazione): policy `as restrictive`
-su ogni tabella utente che richiedono `(select auth.jwt() ->> 'aal') = 'aal2'`,
-più test SQL e di integrazione dedicati.
+Fino alla migration 0004 il TOTP era obbligatorio solo nell'app: un token
+ottenuto con la sola password (AAL1) poteva interrogare direttamente PostgREST.
+Dalla migration `20261003000005_enforce_aal2.sql` l'accesso ai dati richiede
+contemporaneamente:
+
+1. ruolo `authenticated` (anon non ha privilegi);
+2. proprietario corretto (`user_id = auth.uid()`, policy permissive esistenti);
+3. sessione `aal2`: policy **restrictive** `for all to authenticated` con
+   `((select auth.jwt()) ->> 'aal') = 'aal2'` sia in `using` sia in `with check`.
+
+Le policy restrictive sono in AND con le permissive: non possono allargare
+l'accesso. Un token senza claim `aal` è trattato come AAL1.
+
+| Protetto (25 tabelle + Storage) | Non protetto, per scelta |
+|---|---|
+| accounts, transactions, transfer_groups, businesses, income_sources, transaction_categories, categorization_rules, import_profiles, imports, import_files, import_rows, investment_accounts, instruments, investment_plans, investment_transactions, investment_valuations, budgets, budget_categories, goals, goal_accounts, monthly_snapshots, yearly_snapshots, net_worth_snapshots, profiles, audit_logs; bucket `imports` | `account_types` (riferimento globale, nessun dato utente) |
+
+La vista `account_balances` è `security_invoker`, quindi eredita le policy
+delle tabelle sottostanti.
+
+**Bootstrap del secondo fattore.** Enroll, challenge e verify del TOTP passano
+dall'API di Supabase Auth, che scrive `auth.mfa_factors` con il proprio ruolo:
+non sono toccati da queste policy e funzionano con una sessione AAL1. Il
+profilo e i dati iniziali vengono creati dal trigger di signup (security
+definer). L'app non legge dati finanziari prima dell'AAL2 (le pagine `/mfa/*`
+usano solo l'API di Auth).
+
+**Verifica.** Suite SQL (simulazione dei claim JWT) e test di integrazione con
+sessioni reali emesse da Supabase Auth locale (`tests/integration/aal.test.ts`):
+in AAL1 SELECT/INSERT/UPDATE/DELETE negati su tabelle e Storage; in AAL2 CRUD
+consentito; isolamento tra utenti anche in AAL2; anonimo negato. Un test di
+copertura fallisce se una tabella futura con `user_id` non ha la policy AAL2.
+Controprova: senza la migration 0005 questi test falliscono.
 
 ## Cosa l'app NON fa (per scelta)
 

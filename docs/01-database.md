@@ -9,6 +9,7 @@ scelte; in caso di discrepanza vince la migration.
 | `…0002_security.sql` | RLS su ogni tabella, revoke per `anon`, audit log |
 | `…0003_storage.sql` | Bucket privato `imports` + policy per cartella utente |
 | `…0004_bootstrap.sql` | Profilo e configurazione iniziale alla creazione utente |
+| `…0005_enforce_aal2.sql` | Policy restrictive: accesso ai dati solo con sessione MFA (AAL2) |
 
 ## Convenzioni
 

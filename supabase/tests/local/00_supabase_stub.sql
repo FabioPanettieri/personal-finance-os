@@ -2,7 +2,7 @@
 -- Stub minimo dell'ambiente Supabase, SOLO per testare le migration su un
 -- PostgreSQL vanilla (CI / sviluppo senza Docker). Non va mai applicato a un
 -- progetto Supabase reale: lì auth e storage esistono già.
--- Riproduce: ruoli, grant di default su public, auth.uid(), storage minimo.
+-- Riproduce: ruoli, grant di default su public, auth.uid(), auth.jwt(), storage minimo.
 -- =============================================================================
 
 create role anon nologin noinherit;
@@ -31,16 +31,27 @@ returns uuid
 language sql
 stable
 as $$
-  select nullif(
-    coalesce(
-      current_setting('request.jwt.claim.sub', true),
-      current_setting('request.jwt.claims', true)::jsonb ->> 'sub'
-    ),
-    ''
+  -- Stessa definizione di Supabase.
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
   )::uuid
 $$;
 
+-- Come in Supabase: claim del JWT della richiesta (incluso `aal`).
+create function auth.jwt()
+returns jsonb
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(current_setting('request.jwt.claim', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')
+  )::jsonb
+$$;
+
 grant execute on function auth.uid() to anon, authenticated, service_role;
+grant execute on function auth.jwt() to anon, authenticated, service_role;
 
 create table storage.buckets (
   id                 text primary key,

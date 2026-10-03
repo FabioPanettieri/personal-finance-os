@@ -164,3 +164,13 @@ report "SPRINT X — COMPLETED" qui sotto.
   archivia disattivandolo.
 
 **Next sprint**: Sprint 3 — CSV Import.
+
+## SECURITY HARDENING — COMPLETED (tra Sprint 2 e Sprint 3)
+
+- Migration `20261003000005_enforce_aal2.sql`: policy restrictive AAL2 su 25
+  tabelle con dati utente e sul bucket `imports`; migration 0001–0004 invariate
+- Test: suite SQL 117 (simulazione JWT, su Postgres temporaneo e su Supabase
+  locale), integrazione API 36 con sessioni reali AAL1/AAL2, test di copertura
+  per le tabelle future; controprova senza migration: i test AAL1 falliscono
+- Login, configurazione e verifica TOTP, logout, sessione persistente e conti
+  verificati in E2E sullo stack reale

@@ -1,6 +1,8 @@
 import { expect, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { createHash, createHmac, randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+
+import { msUntilNextTotpWindow, totp } from '../../support/totp'
 
 /**
  * Supporto per gli E2E contro lo stack Supabase locale reale. Utenti e dati
@@ -25,28 +27,6 @@ export async function deleteUser(user: E2EUser | undefined) {
   if (user) await admin.auth.admin.deleteUser(user.id)
 }
 
-function base32Decode(input: string): Buffer {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
-  let bits = ''
-  for (const char of input.replace(/=+$/, '').toUpperCase()) {
-    const value = alphabet.indexOf(char)
-    if (value < 0) throw new Error(`Carattere base32 non valido: ${char}`)
-    bits += value.toString(2).padStart(5, '0')
-  }
-  const bytes = bits.match(/.{8}/g) ?? []
-  return Buffer.from(bytes.map((b) => parseInt(b, 2)))
-}
-
-/** Codice TOTP (RFC 6238: SHA-1, 30 s, 6 cifre), come un'app di autenticazione. */
-export function totp(secret: string, at = Date.now()): string {
-  const counter = Buffer.alloc(8)
-  counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)))
-  const hmac = createHmac('sha1', base32Decode(secret)).update(counter).digest()
-  const offset = hmac[hmac.length - 1]! & 0x0f
-  const code = (hmac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000
-  return String(code).padStart(6, '0')
-}
-
 /** Login reale + configurazione TOTP obbligatoria al primo accesso. */
 export async function signInWithMfa(page: Page, user: E2EUser, next = '/') {
   await page.goto(next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`)
@@ -58,9 +38,29 @@ export async function signInWithMfa(page: Page, user: E2EUser, next = '/') {
   await page.getByRole('button', { name: /Configura l’app di autenticazione/ }).click()
   const secret = (await page.locator('code.select-all').textContent())!.trim()
   user.totpSecret = secret
-  await page.getByLabel('Codice di verifica').fill(totp(secret))
-  await page.getByRole('button', { name: 'Attiva e continua' }).click()
+  await submitTotp(page, secret, 'Attiva e continua')
   await expect(page).toHaveURL(next)
+}
+
+/**
+ * Inserisce il codice TOTP corrente. Supabase rifiuta un codice già usato
+ * nella stessa finestra di 30 s: in quel caso attende la finestra successiva.
+ */
+export async function submitTotp(page: Page, secret: string, button: 'Attiva e continua' | 'Verifica') {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.getByLabel('Codice di verifica').fill(totp(secret))
+    await page.getByRole('button', { name: button }).click()
+    const outcome = await Promise.race([
+      page.waitForURL((url) => !url.pathname.startsWith('/mfa/'), { timeout: 10_000 }).then(() => 'ok' as const),
+      page
+        .getByText('Codice non valido o scaduto.')
+        .waitFor({ timeout: 10_000 })
+        .then(() => 'rejected' as const),
+    ])
+    if (outcome === 'ok') return
+    if (attempt === 0) await page.waitForTimeout(msUntilNextTotpWindow())
+  }
+  throw new Error('Codice TOTP rifiutato due volte')
 }
 
 export function fingerprint(seed: string): string {
