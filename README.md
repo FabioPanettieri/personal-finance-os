@@ -29,13 +29,14 @@ mostra quali variabili mancano e nessuna pagina protetta è raggiungibile.
 Richiede Docker. Nessun progetto cloud, nessun dato reale.
 
 ```bash
-npm run db:start          # Postgres + Auth + PostgREST + Storage, migration applicate
-npx supabase status       # URL e publishable key locali da copiare in .env.local
-npm run dev
+npx supabase start        # Postgres + Auth + PostgREST + Storage + Studio, migration applicate
+npm run env:local         # crea .env.local con URL e publishable key LOCALI
+npm run dev               # http://localhost:3000
 ```
 
-Crea l'utente di sviluppo da Studio locale (`npx supabase start` senza `-x studio`)
-oppure con l'Admin API usando la secret key **locale**. `npm run db:reset`
+Crea l'utente da Studio locale (http://127.0.0.1:54323 → Authentication →
+Users → *Add user*, con *Auto Confirm User*) oppure con l'Admin API usando la
+secret key **locale**. `npm run db:start` avvia lo stack senza Studio (CI e test). `npm run db:reset`
 riapplica le migration da zero; `npm run db:stop` ferma lo stack.
 
 ### Collegare un progetto Supabase

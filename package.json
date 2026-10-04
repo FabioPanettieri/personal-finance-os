@@ -20,6 +20,7 @@
     "db:start": "supabase start -x studio,imgproxy,realtime,edge-runtime,logflare,vector,mailpit,supavisor",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset --local",
+    "env:local": "node scripts/write-local-env.mjs",
     "db:types": "supabase gen types typescript --local --schema public > types/database.ts && node scripts/prepend-generated-header.mjs types/database.ts && prettier --no-config --single-quote --no-semi --print-width 120 --write types/database.ts",
     "test:db:supabase": "scripts/db-test-supabase.sh",
     "test:integration": "node scripts/with-local-supabase.mjs vitest run --config vitest.integration.config.ts",
