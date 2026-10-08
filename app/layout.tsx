@@ -9,21 +9,19 @@ import { THEME_INIT_SCRIPT } from '@/lib/theme'
 
 export const metadata: Metadata = {
   title: {
-    default: 'Finance OS',
-    template: '%s · Finance OS',
+    default: 'Finanze',
+    template: '%s · Finanze',
   },
   description: 'Il tuo sistema finanziario personale.',
-  applicationName: 'Finance OS',
+  applicationName: 'Finanze',
   robots: { index: false, follow: false },
   referrer: 'no-referrer',
   formatDetection: { telephone: false },
+  appleWebApp: { capable: true, title: 'Finanze', statusBarStyle: 'black-translucent' },
 }
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f7f8fa' },
-    { media: '(prefers-color-scheme: dark)', color: '#0b0d10' },
-  ],
+  themeColor: '#0a0b0f',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',

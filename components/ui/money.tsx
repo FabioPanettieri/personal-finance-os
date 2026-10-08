@@ -6,7 +6,7 @@ export type MoneyProps = {
   currency?: string
   /** Colora in base al segno: verde per positivi, rosso per negativi. */
   tone?: 'none' | 'signed'
-  signDisplay?: 'auto' | 'always' | 'exceptZero'
+  signDisplay?: 'auto' | 'always' | 'exceptZero' | 'never'
   /** Centesimi più piccoli e leggeri: per gli importi hero. */
   emphasizeUnits?: boolean
   className?: string

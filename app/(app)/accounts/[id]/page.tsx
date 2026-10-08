@@ -4,16 +4,14 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { notFound } from 'next/navigation'
 
-import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Money } from '@/components/ui/money'
 import { AccountActiveToggle } from '@/features/accounts/components/account-active-toggle'
 import { AccountEditForm } from '@/features/accounts/components/account-edit-form'
-import { AccountAvatar } from '@/features/accounts/components/account-list'
-import { AccountTypeBadge } from '@/features/accounts/components/account-type-badge'
 import { BalanceChart } from '@/features/accounts/components/balance-chart'
 import { accountIdSchema } from '@/features/accounts/schemas'
+import { accountColor, bankForAccount, bankGradient } from '@/lib/banks'
 import { balanceSeries, movementsInBalanceWindow, summarizeFlows } from '@/lib/accounts'
 import { formatIsoDate } from '@/lib/dates'
 import { formatAmountInput } from '@/lib/money/parse'
@@ -61,23 +59,23 @@ export default async function AccountDetailPage({ params }: Params) {
         Conti
       </Link>
 
-      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:mb-8">
-        <div className="flex min-w-0 items-center gap-4">
-          <AccountAvatar account={account} size="lg" />
-          <div className="min-w-0">
-            <h1 className="truncate text-2xl font-semibold tracking-[-0.02em] text-fg lg:text-[28px]">{account.name}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-fg-muted">
-              {account.institution ? <span>{account.institution}</span> : null}
-              <AccountTypeBadge type={account.type} />
-              <Badge>{account.currency}</Badge>
-              {account.isActive ? null : <Badge tone="warning">Disattivato</Badge>}
-            </div>
+      <header
+        className="mb-6 flex flex-col gap-6 rounded-[var(--radius-card)] p-5 text-white sm:flex-row sm:items-end sm:justify-between lg:mb-8 lg:p-6"
+        style={{ background: bankGradient(accountColor(account)) }}
+      >
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold tracking-[-0.02em] lg:text-[28px]">{account.name}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-white/80">
+            {account.institution ? <span>{account.institution}</span> : null}
+            <span>· {account.type.label}</span>
+            <span>· {account.currency}</span>
+            {account.isActive ? null : <span className="rounded-full bg-black/25 px-2 py-0.5 text-xs font-semibold">Disattivato</span>}
           </div>
         </div>
         <div className="sm:text-right">
-          <p className="text-[12px] font-medium tracking-wider text-fg-muted uppercase">Saldo</p>
-          <p className="text-3xl font-semibold tracking-[-0.02em] text-fg lg:text-4xl">
-            <Money value={account.balance} currency={account.currency} emphasizeUnits className="[font-variant-numeric:normal]" />
+          <p className="text-[13px] font-medium text-white/75">Saldo</p>
+          <p className="text-[34px] font-bold tracking-[-0.02em] lg:text-[40px]">
+            <Money value={account.balance} currency={account.currency} emphasizeUnits className="text-white [font-variant-numeric:normal] [&_span]:text-white/80" />
           </p>
         </div>
       </header>
@@ -154,6 +152,7 @@ export default async function AccountDetailPage({ params }: Params) {
           <CardHeader title="Impostazioni del conto" description={`Valuta ${account.currency} · tipo ${account.type.label} (non modificabili)`} />
           <AccountEditForm
             accountId={account.id}
+            fixedColor={bankForAccount(account) !== null}
             values={{
               name: account.name,
               institution: account.institution ?? '',

@@ -4,16 +4,13 @@ const USER = { email: 'owner@example.test', password: 'correct-horse-battery', t
 const MOCK = 'http://127.0.0.1:54399'
 
 const PAGES = [
-  { path: '/', heading: 'Home' },
-  { path: '/transactions', heading: 'Transazioni' },
-  { path: '/net-worth', heading: 'Patrimonio' },
-  { path: '/analytics', heading: 'Analytics' },
+  { path: '/', heading: /^Buon(giorno|asera| pomeriggio)/ },
+  { path: '/transactions', heading: 'Movimenti' },
   { path: '/settings', heading: 'Impostazioni' },
   { path: '/accounts', heading: 'Conti' },
-  { path: '/investments', heading: 'Investimenti' },
-  { path: '/reports', heading: 'Report' },
-  { path: '/goals', heading: 'Obiettivi' },
+  { path: '/business', heading: 'Business' },
   { path: '/imports', heading: 'Importazioni' },
+  { path: '/imports/new', heading: 'Importa un estratto' },
   { path: '/settings/security', heading: 'Sicurezza' },
 ]
 
@@ -44,18 +41,18 @@ test('navigazione: sidebar su desktop, bottom nav su mobile', async ({ page, isM
     await expect(sidebar).toBeHidden()
     await expect(bottomNav).toBeVisible()
     await expect(bottomNav.getByRole('link')).toHaveCount(5)
-    await bottomNav.getByRole('link', { name: 'Transazioni' }).click()
+    await bottomNav.getByRole('link', { name: 'Movimenti' }).click()
     await expect(page).toHaveURL('/transactions')
-    await expect(bottomNav.getByRole('link', { name: 'Transazioni' })).toHaveAttribute('aria-current', 'page')
+    await expect(bottomNav.getByRole('link', { name: 'Movimenti' })).toHaveAttribute('aria-current', 'page')
     // Target touch ≥ 44 px (docs/03-design-system.md).
     const box = await bottomNav.getByRole('link', { name: 'Home' }).boundingBox()
     expect(box!.height).toBeGreaterThanOrEqual(44)
   } else {
     await expect(sidebar).toBeVisible()
     await expect(page.locator('nav.lg\\:hidden')).toBeHidden()
-    await sidebar.getByRole('link', { name: 'Importazioni' }).click()
-    await expect(page).toHaveURL('/imports')
-    await expect(sidebar.getByRole('link', { name: 'Importazioni' })).toHaveAttribute('aria-current', 'page')
+    await sidebar.getByRole('link', { name: 'Conti' }).click()
+    await expect(page).toHaveURL('/accounts')
+    await expect(sidebar.getByRole('link', { name: 'Conti' })).toHaveAttribute('aria-current', 'page')
   }
 
   // Nessuno scroll orizzontale.
@@ -66,18 +63,17 @@ test('navigazione: sidebar su desktop, bottom nav su mobile', async ({ page, isM
   await page.screenshot({ path: `tests/e2e/screenshots/mock-home-${testInfo.project.name}-light.png`, fullPage: true })
 })
 
-test('tema scuro persistente', async ({ page }, testInfo) => {
+test('tema: scuro di default, scelta persistente', async ({ page }, testInfo) => {
   const html = page.locator('html')
-  const initial = await html.getAttribute('data-theme')
-  expect(['light', 'dark']).toContain(initial)
+  await expect(html).toHaveAttribute('data-theme', 'dark')
 
-  // automatico → chiaro → scuro
+  // scuro → automatico (sistema chiaro nel test) → chiaro, poi ricarica
   const toggle = page.getByRole('button', { name: /^Tema:/ }).first()
   await toggle.click()
   await toggle.click()
-  await expect(html).toHaveAttribute('data-theme', 'dark')
+  await expect(html).toHaveAttribute('data-theme', 'light')
   await page.reload()
-  await expect(html).toHaveAttribute('data-theme', 'dark')
+  await expect(html).toHaveAttribute('data-theme', 'light')
   await page.screenshot({ path: `tests/e2e/screenshots/mock-home-${testInfo.project.name}-dark.png`, fullPage: true })
 })
 

@@ -33,7 +33,7 @@ function submittedValues(formData: FormData): NonNullable<AccountFormState['valu
 function revalidateAccount(id: string) {
   revalidatePath('/accounts')
   revalidatePath(`/accounts/${id}`)
-  revalidatePath('/net-worth')
+  revalidatePath('/')
 }
 
 export async function updateAccountAction(

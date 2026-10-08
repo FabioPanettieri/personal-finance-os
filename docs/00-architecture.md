@@ -12,7 +12,7 @@ corretta → analytics corrette → UI eccellente**.
 | Framework | Next.js 16 (App Router, RSC, Server Actions), React 19 | Rendering server-side dei dati sensibili, niente API pubblica da esporre |
 | Linguaggio | TypeScript 6.0 `strict` + `noUncheckedIndexedAccess` | Zero `any`, tipi DB generati. TS 7 escluso finché typescript-eslint non lo supporta (`<6.1`) |
 | DB / Auth / Storage | Supabase (PostgreSQL 15+, Auth, Storage, RLS) | RLS come ultima linea di difesa |
-| Hosting | Vercel (regione `fra1`, vicina al progetto Supabase EU) | Deploy Next.js nativo |
+| Hosting | PC personale: Next.js su `127.0.0.1:3000`, raggiungibile dal telefono solo via Tailscale (`tailscale serve`) | Nessuna esposizione su Internet (docs/accesso-privato.md) |
 | Styling | Tailwind CSS 4 + design tokens CSS (`@theme`) | Dark/light via variabili |
 | Primitivi UI | Radix UI (dialog, popover, select, tabs…) + componenti propri | Accessibilità senza look da template |
 | Grafici | Recharts 3 (wrapper propri in `components/charts`) | Composizione React, tooltip custom |

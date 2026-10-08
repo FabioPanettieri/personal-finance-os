@@ -1,4 +1,4 @@
-import type { IsoDate } from '@/lib/dates'
+import { addDays, compareIsoDates, type IsoDate } from '@/lib/dates'
 import {
   BASE_CURRENCY,
   businessPerformance,
@@ -17,7 +17,7 @@ import {
   type NetWorthPoint,
 } from '@/lib/dashboard/metrics'
 import { monthsInRange, resolvePeriod, type Period, type PeriodInput } from '@/lib/dashboard/period'
-import type { Cents } from '@/lib/money'
+import { cents, type Cents } from '@/lib/money'
 
 import { listAccounts, type Account, type DbClient } from '../repositories/accounts'
 import {
@@ -64,9 +64,19 @@ export type Dashboard = {
   businesses: BusinessPerformance[]
   accounts: DashboardAccount[]
   history: NetWorthPoint[]
+  /** Variazione del patrimonio rispetto a 30 giorni fa (null se i dati sono più recenti). */
+  netWorthMonthChange: Cents | null
   recent: RecentTransaction[]
   review: ReviewCounts
   imports: ImportHealth[]
+}
+
+function monthChange(history: readonly NetWorthPoint[], today: IsoDate): Cents | null {
+  if (history.length === 0) return null
+  const monthAgo = addDays(today, -30)
+  const before = history.filter((p) => compareIsoDates(p.date, monthAgo) <= 0).at(-1)
+  if (!before) return null
+  return cents(history.at(-1)!.balance - before.balance)
 }
 
 export async function loadDashboard(db: DbClient, input: PeriodInput, today: IsoDate, timeZone?: string): Promise<Dashboard> {
@@ -126,6 +136,7 @@ export async function loadDashboard(db: DbClient, input: PeriodInput, today: Iso
       investedAtCost: a.type.kind === 'investment' ? (invested.get(a.id) ?? null) : null,
     })),
     history,
+    netWorthMonthChange: monthChange(history, today),
     recent,
     review,
     imports,

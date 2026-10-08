@@ -85,11 +85,13 @@ describe('Field', () => {
 
 describe('BottomNav', () => {
   it('mostra 5 voci e marca quella corrente', () => {
-    pathname.current = '/settings/security'
+    pathname.current = '/transactions/abc'
     render(<BottomNav />)
     expect(screen.getAllByRole('link')).toHaveLength(5)
-    expect(screen.getByRole('link', { name: 'Impostazioni' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Movimenti' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
+    // Importa è il pulsante centrale, con etichetta accessibile.
+    expect(screen.getByRole('link', { name: 'Importa' })).toHaveAttribute('href', '/imports/new')
   })
 })
 

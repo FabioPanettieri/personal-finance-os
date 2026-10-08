@@ -5,13 +5,13 @@ import { notFound } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { z } from 'zod'
 
-import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
 import { Money } from '@/components/ui/money'
-import { ConfirmButton } from '@/features/transactions/components/confirm-button'
-import { METHOD_LABELS, NATURE_LABELS, SOURCE_LABELS, TYPE_LABELS } from '@/features/transactions/labels'
+import { QuickClassify } from '@/features/transactions/components/quick-classify'
+import { NATURE_LABELS, SOURCE_LABELS, TYPE_LABELS } from '@/features/transactions/labels'
+import { accountColor } from '@/lib/banks'
 import { formatIsoDate } from '@/lib/dates'
-import { formatPercent } from '@/lib/money'
+import { choicesFor } from '@/lib/transactions/quick-choices'
+import { cn } from '@/lib/utils/cn'
 import { requireUser } from '@/server/auth/session'
 import { getTransaction } from '@/server/repositories/transactions'
 import { createSupabaseServerClient } from '@/server/supabase/server'
@@ -19,15 +19,16 @@ import { createSupabaseServerClient } from '@/server/supabase/server'
 export const metadata: Metadata = { title: 'Movimento' }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
+  if (children === null || children === undefined || children === '') return null
   return (
-    <div className="grid grid-cols-[9rem_minmax(0,1fr)] gap-3 py-2.5 text-sm sm:grid-cols-[12rem_minmax(0,1fr)]">
-      <dt className="text-fg-muted">{label}</dt>
-      <dd className="min-w-0 break-words text-fg">{children ?? <span className="text-fg-subtle">—</span>}</dd>
+    <div className="flex items-start justify-between gap-4 py-3 text-[15px]">
+      <dt className="shrink-0 text-fg-muted">{label}</dt>
+      <dd className="min-w-0 text-right break-words text-fg">{children}</dd>
     </div>
   )
 }
 
-/** Dettaglio di un movimento. L'IBAN della controparte è mostrato mascherato. */
+/** Dettaglio di un movimento e "Sistema" a due tocchi. L'IBAN della controparte è mascherato. */
 export default async function TransactionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   await requireUser(`/transactions/${id}`)
@@ -35,47 +36,43 @@ export default async function TransactionPage({ params }: { params: Promise<{ id
   const t = await getTransaction(await createSupabaseServerClient(), id)
   if (!t) notFound()
   const internal = t.type === 'transfer' || t.type === 'investment'
+  const color = accountColor({ name: t.account.name, institution: t.account.institution })
+  const currentLabel = [TYPE_LABELS[t.type], t.business ?? t.category].filter(Boolean).join(' · ')
 
   return (
-    <>
+    <div className="mx-auto max-w-2xl">
       <Link href="/transactions" className="-ml-2 mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm text-fg-muted hover:text-fg">
         <ArrowLeft aria-hidden className="size-4" />
-        Transazioni
+        Movimenti
       </Link>
 
-      <header className="mb-6 flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone={internal ? 'neutral' : t.type === 'income' || t.type === 'refund' ? 'positive' : 'accent'}>{TYPE_LABELS[t.type]}</Badge>
-          {!t.isCategorized ? <Badge tone="warning">Da verificare</Badge> : null}
-        </div>
-        <h1 className="text-xl font-semibold tracking-[-0.01em] break-words text-fg lg:text-2xl">{t.description}</h1>
+      <header className="mb-6 flex flex-col items-center gap-2 text-center">
+        <span aria-hidden className="mb-1 h-1.5 w-12 rounded-full" style={{ background: color }} />
+        <h1 className="text-xl font-semibold break-words text-fg">{t.description}</h1>
         <Money
           value={t.amount}
           currency={t.currency}
-          signDisplay="exceptZero"
-          tone={internal ? 'none' : 'signed'}
+          signDisplay={internal ? 'never' : 'exceptZero'}
           emphasizeUnits
-          className="text-3xl font-semibold tracking-[-0.02em] lg:text-4xl"
+          className={cn('text-[40px] font-bold tracking-[-0.03em]', internal ? 'text-fg' : t.amount > 0 ? 'text-positive' : 'text-fg')}
         />
+        <p className="text-sm text-fg-muted">
+          {t.account.name} · {formatIsoDate(t.bookedOn, 'long')}
+        </p>
       </header>
 
       {!t.isCategorized ? (
-        <Card className="mb-4 flex flex-col gap-3 lg:mb-6">
-          <p className="text-sm text-fg-muted">
-            Classificazione proposta {t.ruleName ? `dalla regola “${t.ruleName}”` : 'automaticamente'}
-            {t.confidence !== null ? ` con confidenza ${formatPercent(t.confidence)}` : ''}: confermala se è corretta.
+        <section aria-label="Sistema il movimento" className="mb-6 rounded-[var(--radius-card)] border border-warning/40 bg-surface p-5">
+          <p className="mb-4 text-sm text-fg-muted">
+            {t.ruleName ? `Proposta automatica (regola “${t.ruleName}”): ` : 'Proposta automatica: '}
+            <span className="font-medium text-fg">{currentLabel}</span>
           </p>
-          <ConfirmButton id={t.id} />
-        </Card>
+          <QuickClassify id={t.id} choices={choicesFor(t.amount)} current={currentLabel} canConfirmCurrent />
+        </section>
       ) : null}
 
-      <Card className="mb-4 lg:mb-6">
+      <section aria-label="Dettagli" className="mb-6 rounded-[var(--radius-card)] border border-line bg-surface px-5">
         <dl className="divide-y divide-line">
-          <Row label="Data">{formatIsoDate(t.bookedOn, 'long')}</Row>
-          {t.valueOn && t.valueOn !== t.bookedOn ? <Row label="Data valuta">{formatIsoDate(t.valueOn, 'long')}</Row> : null}
-          <Row label="Conto">
-            <Link href={`/accounts/${t.account.id}`} className="text-accent hover:underline">{t.account.name}</Link>
-          </Row>
           <Row label="Tipo">{TYPE_LABELS[t.type]}</Row>
           <Row label="Natura">{NATURE_LABELS[t.nature] ?? t.nature}</Row>
           <Row label="Categoria">{t.category}</Row>
@@ -83,38 +80,38 @@ export default async function TransactionPage({ params }: { params: Promise<{ id
           <Row label="Fonte di reddito">{t.incomeSource}</Row>
           <Row label="Controparte">{t.counterparty}</Row>
           <Row label="IBAN controparte">{t.counterpartyIbanMasked ? <span className="tabular">{t.counterpartyIbanMasked}</span> : null}</Row>
-          <Row label="Classificazione">
-            {METHOD_LABELS[t.method] ?? t.method}
-            {t.confidence !== null ? ` · confidenza ${formatPercent(t.confidence)}` : ''}
-            {t.ruleName ? ` · regola “${t.ruleName}”` : ''}
+          <Row label="Conto">
+            <Link href={`/accounts/${t.account.id}`} className="font-medium hover:underline">
+              {t.account.name}
+            </Link>
           </Row>
           <Row label="Origine">
             {SOURCE_LABELS[t.source] ?? t.source}
             {t.importInfo ? (
               <>
                 {' · '}
-                <Link href={`/imports/${t.importInfo.id}`} className="text-accent hover:underline">
-                  importazione {SOURCE_LABELS[t.importInfo.bankProfile] ?? t.importInfo.bankProfile}
+                <Link href={`/imports/${t.importInfo.id}`} className="font-medium hover:underline">
+                  {SOURCE_LABELS[t.importInfo.bankProfile] ?? t.importInfo.bankProfile}
                 </Link>
               </>
             ) : null}
           </Row>
-          <Row label="Descrizione originale">
-            <span className="text-fg-muted">{t.originalDescription}</span>
+          <Row label="Testo della banca">
+            <span className="text-sm text-fg-muted">{t.originalDescription}</span>
           </Row>
         </dl>
-      </Card>
+      </section>
 
       {internal ? (
-        <Card>
-          <h2 className="mb-3 flex items-center gap-2 text-[13px] font-medium tracking-wide text-fg-muted uppercase">
+        <section aria-label="Trasferimento" className="mb-6 rounded-[var(--radius-card)] border border-line bg-surface p-5">
+          <h2 className="mb-2 flex items-center gap-2 text-[15px] font-semibold text-fg">
             <ArrowLeftRight aria-hidden className="size-4" /> Trasferimento
           </h2>
           {t.transferLegs.length > 0 ? (
             <ul className="divide-y divide-line">
               {t.transferLegs.map((leg) => (
                 <li key={leg.id}>
-                  <Link href={`/transactions/${leg.id}`} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-accent">
+                  <Link href={`/transactions/${leg.id}`} className="flex items-center justify-between gap-3 py-3 text-[15px] hover:text-fg-muted">
                     <span>
                       {leg.accountName} · {formatIsoDate(leg.bookedOn)}
                     </span>
@@ -125,11 +122,20 @@ export default async function TransactionPage({ params }: { params: Promise<{ id
             </ul>
           ) : (
             <p className="text-sm text-fg-muted">
-              Controparte non ancora collegata: verrà riconosciuta importando l’estratto dell’altro conto. Non è contato come entrata né come spesa.
+              L’altra metà verrà collegata quando importi l’estratto dell’altro conto. Non conta né come entrata né come spesa.
             </p>
           )}
-        </Card>
+        </section>
       ) : null}
-    </>
+
+      {t.isCategorized ? (
+        <details className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
+          <summary className="cursor-pointer text-[15px] font-semibold text-fg">Cambia classificazione</summary>
+          <div className="mt-4">
+            <QuickClassify id={t.id} choices={choicesFor(t.amount)} current={null} canConfirmCurrent={false} />
+          </div>
+        </details>
+      ) : null}
+    </div>
   )
 }

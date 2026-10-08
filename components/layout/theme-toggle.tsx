@@ -4,6 +4,7 @@ import { Monitor, Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import {
+  DEFAULT_THEME_PREFERENCE,
   THEME_STORAGE_KEY,
   isThemePreference,
   nextThemePreference,
@@ -21,9 +22,9 @@ const LABELS: Record<ThemePreference, string> = {
 function readPreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY)
-    return isThemePreference(stored) ? stored : 'system'
+    return isThemePreference(stored) ? stored : DEFAULT_THEME_PREFERENCE
   } catch {
-    return 'system'
+    return DEFAULT_THEME_PREFERENCE
   }
 }
 
@@ -48,7 +49,7 @@ export function ThemeToggle({ className, showLabel = false }: { className?: stri
     return () => media.removeEventListener('change', onChange)
   }, [])
 
-  const current = preference ?? 'system'
+  const current = preference ?? DEFAULT_THEME_PREFERENCE
   const Icon = current === 'dark' ? Moon : current === 'light' ? Sun : Monitor
 
   return (

@@ -98,12 +98,12 @@ test('primo accesso: login → configurazione TOTP obbligatoria → dashboard, s
   await page.getByRole('button', { name: 'Attiva e continua' }).click()
 
   await expect(page).toHaveURL('/')
-  await expect(page.getByRole('heading', { name: 'Home', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Buon/, level: 1 })).toBeVisible()
   await expect(page.getByText('Patrimonio netto')).toBeVisible()
 
   // Persistenza: ricarica e nuova scheda restano autenticate.
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Home', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Buon/, level: 1 })).toBeVisible()
   const secondTab = await context.newPage()
   await secondTab.goto('/settings/security')
   await expect(secondTab.getByRole('main').getByText(USER.email)).toBeVisible()
@@ -126,7 +126,8 @@ test('accesso successivo: con TOTP già attivo viene chiesto il codice', async (
   await login(page)
   await enrollTotp(page)
   await expect(page).toHaveURL('/')
-  await page.getByRole('button', { name: 'Esci' }).first().click()
+  await page.goto('/settings/security')
+  await page.getByRole('main').getByRole('button', { name: 'Esci' }).click()
   await expect(page).toHaveURL('/login')
 
   await login(page)
@@ -139,15 +140,15 @@ test('accesso successivo: con TOTP già attivo viene chiesto il codice', async (
 })
 
 test('la destinazione richiesta prima del login sopravvive al passaggio MFA', async ({ page }) => {
-  await page.goto('/goals')
-  await expect(page).toHaveURL('/login?next=%2Fgoals')
+  await page.goto('/accounts')
+  await expect(page).toHaveURL('/login?next=%2Faccounts')
   await login(page)
-  await expect(page).toHaveURL('/mfa/setup?next=%2Fgoals')
+  await expect(page).toHaveURL('/mfa/setup?next=%2Faccounts')
   await page.getByRole('button', { name: /Configura l’app di autenticazione/ }).click()
   await page.getByLabel('Codice di verifica').fill(USER.totp)
   await page.getByRole('button', { name: 'Attiva e continua' }).click()
-  await expect(page).toHaveURL('/goals')
-  await expect(page.getByRole('heading', { name: 'Obiettivi', level: 1 })).toBeVisible()
+  await expect(page).toHaveURL('/accounts')
+  await expect(page.getByRole('heading', { name: 'Conti', level: 1 })).toBeVisible()
 })
 
 test('open redirect bloccato: next esterno ignorato', async ({ page }) => {

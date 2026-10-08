@@ -25,16 +25,9 @@ test('elenco: conti bootstrap con saldo, istituto, valuta, tipo e attività', as
   await expect(page.getByRole('heading', { name: 'Conti', level: 1 })).toBeVisible()
   const list = page.getByRole('list', { name: 'Conti attivi' })
   await expect(list.getByRole('listitem')).toHaveCount(5)
-  for (const [name, detail] of [
-    ['ING Direct', 'ING · EUR'],
-    ['ING Conto Risparmio', 'ING · EUR'],
-    ['Revolut', 'Revolut · EUR'],
-    ['Carta di credito', 'ING · EUR'],
-    ['Trade Republic', 'Trade Republic · EUR'],
-  ] as const) {
+  for (const name of ['ING Direct', 'ING Conto Risparmio', 'Revolut', 'Carta di credito', 'Trade Republic']) {
     const row = list.getByRole('listitem').filter({ hasText: name })
-    await expect(row).toContainText(detail)
-    await expect(row).toContainText('Nessuna transazione')
+    await expect(row).toContainText('Nessun movimento')
     await expect(row).toContainText('0,00')
   }
   await expect(list.getByRole('listitem').filter({ hasText: 'Trade Republic' })).toContainText('Broker / Investimenti')
@@ -103,7 +96,7 @@ test('dettaglio con movimenti: flussi, trasferimenti, grafico e tabella dati', a
   await page.goto('/accounts')
   await expect(page.getByText('Saldo complessivo').locator('..')).toContainText('1.450,50')
   await expect(page.getByRole('list', { name: 'Conti attivi' }).getByRole('listitem').filter({ hasText: 'ING Direct' })).toContainText(
-    '3 transazioni · ultima 5 set 2026',
+    '3 movimenti · ultimo 5 set 2026',
   )
   await page.screenshot({ path: `tests/e2e/screenshots/local-accounts-${testInfo.project.name}.png`, fullPage: true })
 })
@@ -159,18 +152,16 @@ test('isolamento: un altro utente non può aprire i conti altrui', async ({ page
   await expect(page.getByRole('heading', { name: 'Conto non trovato' })).toBeVisible()
 })
 
-test('mobile: Conti raggiungibile da Patrimonio senza voci extra nella bottom nav', async ({ page, isMobile }) => {
+test('mobile: Conti nella barra in basso, carte comode da toccare', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'Percorso specifico per mobile')
   const user = await newUser('mobile')
   await signInWithMfa(page, user)
 
   const bottomNav = page.locator('nav[aria-label="Navigazione principale"]').last()
   await expect(bottomNav.getByRole('link')).toHaveCount(5)
-  await bottomNav.getByRole('link', { name: 'Patrimonio' }).click()
-  await page.getByRole('link', { name: /Conti/ }).first().click()
+  await bottomNav.getByRole('link', { name: 'Conti' }).click()
   await expect(page).toHaveURL('/accounts')
-  // Sulla sezione Conti resta evidenziata la voce Patrimonio.
-  await expect(bottomNav.getByRole('link', { name: 'Patrimonio' })).toHaveAttribute('aria-current', 'page')
+  await expect(bottomNav.getByRole('link', { name: 'Conti' })).toHaveAttribute('aria-current', 'page')
 
   const row = page.getByRole('list', { name: 'Conti attivi' }).getByRole('link').first()
   const box = await row.boundingBox()

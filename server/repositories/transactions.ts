@@ -1,8 +1,10 @@
+import { normalizeDescription } from '@/lib/csv/values'
 import { isIsoDate, type IsoDate } from '@/lib/dates'
 import { IMPORTERS } from '@/lib/imports/importers'
 import type { ImportSource } from '@/lib/imports/types'
 import { centsFromDb, type Cents } from '@/lib/money'
 import { typesFor, type TransactionFilters } from '@/lib/transactions/filters'
+import { findChoice } from '@/lib/transactions/quick-choices'
 
 import { RepositoryError, type DbClient } from './accounts'
 
@@ -32,6 +34,7 @@ export type TransactionListItem = {
   currency: string
   type: TxType
   accountName: string
+  accountInstitution: string | null
   categoryName: string | null
   businessName: string | null
   isCategorized: boolean
@@ -54,7 +57,7 @@ export async function listTransactions(
   let query = db
     .from('transactions')
     .select(
-      'id, booked_on, description, amount_cents, currency, type, is_categorized, transfer_group_id, accounts!inner(name), transaction_categories(name), businesses(name)',
+      'id, booked_on, description, amount_cents, currency, type, is_categorized, transfer_group_id, accounts!inner(name, institution), transaction_categories(name), businesses(name)',
       { count: 'exact' },
     )
   if (filters.from) query = query.gte('booked_on', filters.from)
@@ -81,11 +84,12 @@ export async function listTransactions(
   return {
     items: data.map((r) => {
       const row = r as typeof r & {
-        accounts: { name: string }
+        accounts: { name: string; institution: string | null }
         transaction_categories: { name: string } | null
         businesses: { name: string } | null
       }
       return {
+        accountInstitution: row.accounts.institution,
         id: row.id,
         bookedOn: date(row.booked_on),
         description: row.description,
@@ -115,7 +119,7 @@ export type TransactionDetail = {
   currency: string
   type: TxType
   nature: string
-  account: { id: string; name: string }
+  account: { id: string; name: string; institution: string | null }
   category: string | null
   business: string | null
   incomeSource: string | null
@@ -142,14 +146,14 @@ export async function getTransaction(db: DbClient, id: string): Promise<Transact
   const { data, error } = await db
     .from('transactions')
     .select(
-      '*, accounts!inner(id, name), transaction_categories(name, parent_id), businesses(name), income_sources(name), categorization_rules(name), imports(id, bank_profile, created_at)',
+      '*, accounts!inner(id, name, institution), transaction_categories(name, parent_id), businesses(name), income_sources(name), categorization_rules(name), imports(id, bank_profile, created_at)',
     )
     .eq('id', id)
     .maybeSingle()
   if (error) fail('Lettura movimento', error)
   if (!data) return null
   const row = data as typeof data & {
-    accounts: { id: string; name: string }
+    accounts: { id: string; name: string; institution: string | null }
     transaction_categories: { name: string; parent_id: string | null } | null
     businesses: { name: string } | null
     income_sources: { name: string } | null
@@ -239,4 +243,82 @@ export async function confirmTransaction(db: DbClient, id: string): Promise<bool
     .select('id')
   if (error) fail('Conferma movimento', error)
   return data.length === 1
+}
+
+export type ClassifyResult = { ok: true; ruleCreated: boolean } | { ok: false; error: string }
+
+/**
+ * "Sistema" un movimento con una scelta rapida: imposta tipo, natura,
+ * categoria, business e fonte, e lo segna come confermato. Con `remember`
+ * crea una regola dell'utente nel database (stessa descrizione → stessa
+ * classificazione) che si applica ai prossimi import, senza toccare il codice.
+ */
+export async function classifyTransaction(db: DbClient, id: string, choiceKey: string, remember: boolean): Promise<ClassifyResult> {
+  const { data: tx, error } = await db.from('transactions').select('id, amount_cents, description, transfer_group_id').eq('id', id).maybeSingle()
+  if (error) fail('Lettura movimento', error)
+  if (!tx) return { ok: false, error: 'Movimento non trovato' }
+  const amount = Number(tx.amount_cents)
+  const choice = findChoice(amount, choiceKey)
+  if (!choice) return { ok: false, error: 'Scelta non valida per questo movimento' }
+
+  const [path0, path1] = (choice.categoryPath ?? '').split(' > ')
+  const [categories, business, source] = await Promise.all([
+    choice.categoryPath ? db.from('transaction_categories').select('id, name, parent_id').in('name', [path0!, path1].filter(Boolean) as string[]) : Promise.resolve({ data: [], error: null }),
+    choice.businessSlug ? db.from('businesses').select('id').eq('slug', choice.businessSlug).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    choice.incomeSourceName ? db.from('income_sources').select('id').eq('name', choice.incomeSourceName).maybeSingle() : Promise.resolve({ data: null, error: null }),
+  ])
+  if (categories.error) fail('Lettura categorie', categories.error)
+  const rows = categories.data ?? []
+  const root = rows.find((c) => c.name === path0 && c.parent_id === null)
+  const categoryId = path1 ? (rows.find((c) => c.name === path1 && c.parent_id === root?.id)?.id ?? null) : (root?.id ?? null)
+  const businessId = business.data?.id ?? null
+  const incomeSourceId = choice.type === 'income' ? (source.data?.id ?? null) : null
+  const internal = choice.type === 'transfer' || choice.type === 'investment'
+
+  const { error: updateError } = await db
+    .from('transactions')
+    .update({
+      type: choice.type,
+      nature: choice.nature,
+      category_id: categoryId,
+      business_id: internal ? null : businessId,
+      income_source_id: incomeSourceId,
+      is_categorized: true,
+      categorization_method: 'manual',
+      categorization_confidence: 1,
+      categorization_rule_id: null,
+      // Un movimento che non è più un trasferimento esce dal gruppo.
+      ...(internal ? {} : { transfer_group_id: null }),
+    })
+    .eq('id', id)
+  if (updateError) fail('Aggiornamento movimento', updateError)
+
+  let ruleCreated = false
+  const pattern = normalizeDescription(tx.description).slice(0, 120)
+  if (remember && pattern.length >= 3) {
+    const name = `Ricordato: ${tx.description}`.slice(0, 80)
+    const { data: existing } = await db.from('categorization_rules').select('id').eq('name', name).maybeSingle()
+    const values = {
+      name,
+      priority: 20,
+      origin: 'learned' as const,
+      match_field: 'description',
+      match_type: 'contains' as const,
+      pattern,
+      direction: amount > 0 ? 'in' : 'out',
+      set_type: choice.type,
+      set_nature: choice.nature,
+      set_category_id: categoryId,
+      set_business_id: internal ? null : businessId,
+      set_income_source_id: incomeSourceId,
+      confidence: 0.95,
+      is_active: true,
+    }
+    const result = existing
+      ? await db.from('categorization_rules').update(values).eq('id', existing.id)
+      : await db.from('categorization_rules').insert(values)
+    if (result.error) fail('Salvataggio regola', result.error)
+    ruleCreated = true
+  }
+  return { ok: true, ruleCreated }
 }

@@ -2,19 +2,13 @@ import { FileUp } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-import { Card, CardHeader } from '@/components/ui/card'
-import { EmptyState } from '@/components/ui/empty-state'
+import { AccountRow, BankCard } from '@/components/finance/bank-card'
+import { SectionTitle } from '@/components/finance/section-title'
+import { TransactionRow } from '@/components/finance/transaction-row'
 import { Money } from '@/components/ui/money'
-import { AccountOverview } from '@/features/dashboard/components/account-overview'
-import { ImportHealthList, ReviewCard } from '@/features/dashboard/components/attention'
-import { BreakdownList } from '@/features/dashboard/components/breakdown-list'
-import { BusinessPerformanceList } from '@/features/dashboard/components/business-performance'
-import { CashFlowChart } from '@/features/dashboard/components/cash-flow-chart'
-import { NetWorthChart } from '@/features/dashboard/components/net-worth-chart'
-import { PeriodSelector } from '@/features/dashboard/components/period-selector'
-import { RecentActivity } from '@/features/dashboard/components/recent-activity'
-import { Stat } from '@/features/dashboard/components/stat'
-import { DEFAULT_TIME_ZONE, formatIsoDate, today } from '@/lib/dates'
+import { MonthSummary, NetWorthHero, PeriodTabs, ReviewBanner, SpendingList } from '@/features/dashboard/components/home'
+import { splitAccounts } from '@/features/accounts/split'
+import { DEFAULT_TIME_ZONE, today } from '@/lib/dates'
 import { transactionsHref } from '@/lib/transactions/filters'
 import { getProfile, requireUser } from '@/server/auth/session'
 import { loadDashboard } from '@/server/services/dashboard'
@@ -22,13 +16,18 @@ import { createSupabaseServerClient } from '@/server/supabase/server'
 
 export const metadata: Metadata = { title: 'Home' }
 
+function greeting(timeZone: string): string {
+  const hour = Number(new Intl.DateTimeFormat('it-IT', { hour: 'numeric', hourCycle: 'h23', timeZone }).format(new Date()))
+  return hour < 13 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera'
+}
+
 /**
- * Dashboard finanziaria: una vista sui dati, non un secondo sistema contabile.
- * Saldi da account_balances, flussi dagli aggregati SQL (migration 0007),
- * nessuna metrica salvata. Trasferimenti e versamenti agli investimenti non
- * sono mai entrate o uscite.
+ * Home: quanto hai, cosa è successo nel periodo, cosa va sistemato. Una vista
+ * sui dati (saldi da account_balances, flussi dagli aggregati SQL), nessuna
+ * metrica salvata. Trasferimenti e versamenti agli investimenti non sono mai
+ * entrate o uscite.
  */
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireUser('/')
   const params = await searchParams
   const one = (key: string) => (typeof params[key] === 'string' ? (params[key] as string) : null)
@@ -36,191 +35,138 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const timeZone = profile?.timezone ?? DEFAULT_TIME_ZONE
   const now = today(timeZone)
   const d = await loadDashboard(await createSupabaseServerClient(), { period: one('period'), from: one('from'), to: one('to') }, now, timeZone)
-  const { period, currency, breakdown } = d
+  const { period, currency } = d
   const range = { from: period.from, to: period.to }
-  const periodText = `${formatIsoDate(period.from)} – ${formatIsoDate(period.to)}`
+  const name = profile?.display_name?.trim().split(/\s+/)[0]
+  const { main, other } = splitAccounts(d.accounts)
 
   return (
     <>
-      <header className="mb-6 flex flex-col gap-4 lg:mb-8">
+      <header className="mb-6 flex flex-col gap-4 lg:mb-8 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-fg lg:text-[28px]">Home</h1>
-          <p className="mt-1 text-sm text-fg-muted">
-            {period.label} · {periodText}
-          </p>
+          <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg lg:text-[30px]">
+            {greeting(timeZone)}
+            {name ? `, ${name}` : ''}
+          </h1>
+          <p className="mt-1 text-[15px] text-fg-muted">Ecco come vanno i tuoi soldi.</p>
         </div>
-        <PeriodSelector period={period} />
+        <PeriodTabs period={period} />
       </header>
 
       {!d.hasData ? (
-        <EmptyState
-          icon={FileUp}
-          title="Nessun movimento ancora"
-          description="Importa gli estratti di ING, Revolut e Trade Republic: la dashboard si costruisce dai tuoi movimenti, senza numeri inventati."
-          action={
-            <Link href="/imports/new" className="text-sm font-medium text-accent hover:underline">
-              Importa un estratto conto
-            </Link>
-          }
-          className="mb-6"
-        />
+        <Link
+          href="/imports/new"
+          className="mb-6 flex items-center gap-4 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface p-6 transition-colors hover:bg-surface-2"
+        >
+          <span
+            className="grid size-12 shrink-0 place-items-center rounded-full text-white"
+            style={{ background: 'linear-gradient(135deg, var(--bank-revolut), var(--bank-ing) 55%, var(--bank-tr))' }}
+          >
+            <FileUp aria-hidden className="size-5" />
+          </span>
+          <span>
+            <span className="block text-base font-semibold text-fg">Nessun movimento ancora</span>
+            <span className="block text-sm text-fg-muted">Importa il primo estratto di ING, Revolut o Trade Republic: tocca qui.</span>
+          </span>
+        </Link>
       ) : null}
 
-      <div className="mb-4 lg:mb-6">
-        <ReviewCard review={d.review} />
+      <div className="mb-6 grid gap-4 lg:mb-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-6">
+        <NetWorthHero
+          breakdown={d.breakdown}
+          monthChange={d.netWorthMonthChange}
+          history={d.history}
+          today={now}
+          currency={currency}
+          hasData={d.hasData}
+        />
+        <MonthSummary
+          title={period.preset === 'this-month' ? 'Questo mese' : period.label}
+          income={d.flows.income}
+          expenses={d.flows.expenses}
+          incomeHref={transactionsHref({ ...range, type: 'income' })}
+          expensesHref={transactionsHref({ ...range, type: 'spending' })}
+          currency={currency}
+        />
       </div>
 
-      <section aria-label="Indicatori principali" className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:mb-6 lg:grid-cols-4 lg:gap-4">
-        <Stat
-          testId="kpi-net-worth"
-          label="Patrimonio netto"
-          value={d.hasData ? breakdown.netWorth : null}
-          currency={currency}
-          hero
-          note={
-            breakdown.investedAtCost !== 0 ? (
-              <>
-                Investimenti al costo <Money value={breakdown.investedAtCost} currency={currency} />: valore di mercato non disponibile
-              </>
-            ) : (
-              'Saldo attuale di tutti i conti'
-            )
-          }
-        />
-        <Stat
-          testId="kpi-liquidity"
-          label="Liquidità"
-          value={d.hasData ? breakdown.liquidity : null}
-          currency={currency}
-          hero
-          note={
-            breakdown.cards !== 0 ? (
-              <>
-                Carte escluse: <Money value={breakdown.cards} currency={currency} signDisplay="exceptZero" />
-              </>
-            ) : (
-              'Conti correnti, deposito e liquidità sul broker'
-            )
-          }
-        />
-        <Stat
-          testId="kpi-income"
-          label="Entrate"
-          value={d.hasData ? d.flows.income : null}
-          currency={currency}
-          ratio={period.previous ? d.comparison.income : undefined}
-          ratioLabel={period.previousLabel}
-          note={<Link href={transactionsHref({ ...range, type: 'income' })} className="hover:text-fg hover:underline">{d.flows.incomeCount} movimenti</Link>}
-        />
-        <Stat
-          testId="kpi-expenses"
-          label="Uscite"
-          value={d.hasData ? d.flows.expenses : null}
-          currency={currency}
-          ratio={period.previous ? d.comparison.expenses : undefined}
-          ratioLabel={period.previousLabel}
-          goodWhen="down"
-          note={<Link href={transactionsHref({ ...range, type: 'spending' })} className="hover:text-fg hover:underline">{d.flows.expenseCount} movimenti · al netto dei rimborsi</Link>}
-        />
+      <div className="mb-6 lg:mb-8">
+        <ReviewBanner transactions={d.review.transactions} importRows={d.review.importRows} />
+      </div>
+
+      <section aria-labelledby="accounts-title" className="mb-6 lg:mb-8">
+        <SectionTitle id="accounts-title" href="/accounts" linkLabel="Tutti i conti">
+          I tuoi conti
+        </SectionTitle>
+        <ul aria-label="Conti" className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:gap-4">
+          {main.map((a) => (
+            <li key={a.id} className="w-[78%] shrink-0 snap-start sm:w-auto">
+              <BankCard
+                account={{ ...a, typeLabel: a.type.label }}
+                footer={
+                  a.investedAtCost ? (
+                    <>
+                      di cui <Money value={a.investedAtCost} currency={a.currency} /> investiti
+                    </>
+                  ) : a.periodChange !== null ? (
+                    <>
+                      <Money value={a.periodChange} currency={a.currency} signDisplay="exceptZero" /> nel periodo
+                    </>
+                  ) : (
+                    'Nessun movimento nel periodo'
+                  )
+                }
+              />
+            </li>
+          ))}
+        </ul>
+        {other.length > 0 ? (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:gap-4">
+            {other.map((a) => (
+              <AccountRow
+                key={a.id}
+                account={{ ...a, typeLabel: a.type.label }}
+                note={a.type.code === 'card' && a.balance > 0 ? 'Addebiti saldati · spese della carta non importate' : a.type.label}
+              />
+            ))}
+          </div>
+        ) : null}
       </section>
 
-      <Card className="mb-4 lg:mb-6">
-        <CardHeader
-          title="Andamento del patrimonio"
-          description={d.firstDataDate ? `Dal ${formatIsoDate(d.firstDataDate)}: nessuno storico prima dei dati importati.` : undefined}
-        />
-        <NetWorthChart history={d.history} today={now} currency={currency} />
-      </Card>
-
-      <div className="mb-4 grid gap-4 lg:mb-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-6">
-        <Card>
-          <CardHeader
-            title="Cash flow"
-            description={
-              <span data-testid="kpi-cash-flow">
-                Netto del periodo{' '}
-                <Money value={d.flows.cashFlow} currency={currency} signDisplay="exceptZero" tone="signed" className="font-semibold" />
-              </span>
-            }
-          />
-          <CashFlowChart bars={d.bars} currency={currency} />
-        </Card>
-        <Card>
-          <CardHeader title="Spese per categoria" description="Al netto dei rimborsi" />
-          <BreakdownList
-            label="Spese per categoria"
+      <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
+        <section aria-labelledby="spending-title" className="rounded-[var(--radius-card)] border border-line bg-surface p-5 lg:p-6">
+          <SectionTitle id="spending-title">Dove vanno i soldi</SectionTitle>
+          <SpendingList
             currency={currency}
-            empty="Nessuna spesa nel periodo."
-            items={d.categories.map((c) => ({
-              key: c.categoryId ?? 'none',
-              label: c.label,
-              amount: c.amount,
-              share: c.share,
-              count: c.count,
-              href: transactionsHref({ ...range, type: 'spending', categoryId: c.categoryId ?? 'none' }),
-            }))}
+            items={d.categories
+              .filter((c) => c.amount > 0)
+              .slice(0, 6)
+              .map((c) => ({
+                key: c.categoryId ?? 'none',
+                label: c.label,
+                amount: c.amount,
+                share: c.share,
+                href: transactionsHref({ ...range, type: 'spending', categoryId: c.categoryId ?? 'none' }),
+              }))}
           />
-        </Card>
+        </section>
+        <section aria-labelledby="recent-title" className="rounded-[var(--radius-card)] border border-line bg-surface p-5 lg:p-6">
+          <SectionTitle id="recent-title" href="/transactions" linkLabel="Tutti">
+            Ultimi movimenti
+          </SectionTitle>
+          {d.recent.length > 0 ? (
+            <ul aria-label="Ultimi movimenti">
+              {d.recent.slice(0, 6).map((t) => (
+                <li key={t.id}>
+                  <TransactionRow tx={t} showDate />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="py-6 text-center text-sm text-fg-muted">Nessun movimento.</p>
+          )}
+        </section>
       </div>
-
-      <div className="mb-4 grid gap-4 lg:mb-6 lg:grid-cols-2 lg:gap-6">
-        <Card>
-          <CardHeader title="Fonti di reddito" />
-          <BreakdownList
-            label="Fonti di reddito"
-            currency={currency}
-            empty="Nessuna entrata nel periodo."
-            items={d.incomeSources.map((s) => ({
-              key: s.incomeSourceId ?? 'none',
-              label: s.label,
-              amount: s.amount,
-              share: s.share,
-              count: s.count,
-              href: transactionsHref({ ...range, type: 'income', incomeSourceId: s.incomeSourceId ?? 'none' }),
-            }))}
-          />
-        </Card>
-        <Card>
-          <CardHeader title="Attività" description="Solo movimenti classificati con il business" />
-          <BusinessPerformanceList items={d.businesses} currency={currency} range={range} />
-        </Card>
-      </div>
-
-      <section aria-labelledby="accounts-heading" className="mb-4 lg:mb-6">
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 id="accounts-heading" className="text-[13px] font-medium tracking-wide text-fg-muted uppercase">
-            Conti
-          </h2>
-          <Link href="/accounts" className="text-sm text-fg-muted hover:text-fg">
-            Tutti i conti
-          </Link>
-        </div>
-        <AccountOverview accounts={d.accounts} periodLabel="Nel periodo" />
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-6">
-        <Card>
-          <CardHeader
-            title="Attività recenti"
-            action={
-              <Link href="/transactions" className="text-sm text-fg-muted hover:text-fg">
-                Tutti i movimenti
-              </Link>
-            }
-          />
-          <RecentActivity items={d.recent} />
-        </Card>
-        <Card>
-          <CardHeader title="Ultimo import" />
-          <ImportHealthList imports={d.imports} />
-        </Card>
-      </div>
-
-      {d.otherCurrencies.length > 0 ? (
-        <p className="mt-4 text-xs text-fg-subtle">
-          Importi in {currency}. Conti in altre valute ({d.otherCurrencies.join(', ')}) non sono sommati: vedi la pagina Conti.
-        </p>
-      ) : null}
     </>
   )
 }

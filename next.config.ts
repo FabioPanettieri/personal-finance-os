@@ -19,7 +19,9 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   experimental: {
     // CSV fino a 10 MB (limite del bucket) + margine per il multipart.
-    serverActions: { bodySizeLimit: '11mb' },
+    // allowedOrigins: l'app si apre anche dal nome Tailscale del PC
+    // (https://<pc>.<tailnet>.ts.net, via `tailscale serve`), mai da Internet.
+    serverActions: { bodySizeLimit: '11mb', allowedOrigins: ['*.ts.net'] },
     proxyClientMaxBodySize: '11mb',
   },
   reactStrictMode: true,

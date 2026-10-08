@@ -1,2 +1,6 @@
 # Fixture CSV byte per byte (CRLF, NUL di riempimento): nessuna conversione.
 tests/fixtures/csv/**/*.csv -text
+
+# Script Windows: sempre CRLF.
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

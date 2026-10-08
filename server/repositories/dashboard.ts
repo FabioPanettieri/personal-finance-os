@@ -143,6 +143,7 @@ export type RecentTransaction = {
   currency: string
   type: 'income' | 'expense' | 'transfer' | 'investment' | 'refund'
   accountName: string
+  accountInstitution: string | null
   categoryName: string | null
   businessName: string | null
   isCategorized: boolean
@@ -151,14 +152,14 @@ export type RecentTransaction = {
 export async function recentTransactions(db: DbClient, limit = 10): Promise<RecentTransaction[]> {
   const { data, error } = await db
     .from('transactions')
-    .select('id, booked_on, description, amount_cents, currency, type, is_categorized, accounts!inner(name), transaction_categories(name), businesses(name)')
+    .select('id, booked_on, description, amount_cents, currency, type, is_categorized, accounts!inner(name, institution), transaction_categories(name), businesses(name)')
     .order('booked_on', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) fail('Ultimi movimenti', error)
   return data.map((r) => {
     const row = r as typeof r & {
-      accounts: { name: string }
+      accounts: { name: string; institution: string | null }
       transaction_categories: { name: string } | null
       businesses: { name: string } | null
     }
@@ -170,6 +171,7 @@ export async function recentTransactions(db: DbClient, limit = 10): Promise<Rece
       currency: row.currency,
       type: row.type,
       accountName: row.accounts.name,
+      accountInstitution: row.accounts.institution,
       categoryName: row.transaction_categories?.name ?? null,
       businessName: row.businesses?.name ?? null,
       isCategorized: row.is_categorized,

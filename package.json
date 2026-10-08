@@ -7,9 +7,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 127.0.0.1",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 127.0.0.1 -p 3000",
+    "app": "next build && next start -H 127.0.0.1 -p 3000",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",

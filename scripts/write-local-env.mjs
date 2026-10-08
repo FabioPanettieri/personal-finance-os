@@ -1,13 +1,13 @@
 // Crea .env.local per lo sviluppo con lo stack Supabase LOCALE (`npx supabase start`):
 // URL e publishable key letti da `supabase status`. Valori demo della CLI
 // locale, mai chiavi reali; .env.local è ignorato da git.
-import { execFileSync } from 'node:child_process'
+import { execSync } from 'node:child_process'
 import { existsSync, writeFileSync } from 'node:fs'
 
-const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx'
 let raw
 try {
-  raw = execFileSync(npx, ['supabase', 'status', '-o', 'json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], shell: process.platform === 'win32' })
+  // Comando fisso (nessun input esterno): una stringa evita l'avviso DEP0190 su Windows.
+  raw = execSync('npx supabase status -o json', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
 } catch {
   console.error('✗ Supabase locale non attivo: avvia prima `npx supabase start` (con Docker Desktop aperto).')
   process.exit(1)

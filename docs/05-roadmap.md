@@ -241,3 +241,24 @@ resta da fare. Dettagli: `docs/07-dashboard.md`.
 - Token colore dei grafici validati per daltonismo in light e dark.
 
 **Database**: migration 0007 (solo funzioni SECURITY INVOKER, nessuna tabella).
+
+## REDESIGN + ACCESSO PRIVATO — COMPLETED (dopo lo Sprint 4)
+
+Su richiesta: app più chiara e accattivante, solo su PC e telefono.
+
+**Implemented**
+- Tema scuro premium di default, colori delle banche (Revolut viola, ING
+  arancione, Trade Republic blu), navigazione a 5 voci (docs/03-design-system.md).
+- Home: saluto, patrimonio con andamento a 6 mesi, "Questo mese" (entrate,
+  uscite, ti restano), da sistemare, carte dei conti, dove vanno i soldi,
+  ultimi movimenti.
+- Movimenti: ricerca, filtri rapidi (da sistemare, per conto), raggruppati per giorno.
+- Dettaglio movimento: "Sistema" con scelte rapide e regola ricordata
+  (`classifyTransaction`, regole `origin = 'learned'`).
+- Conti, Importa (3 passi, carte delle banche), nuova pagina Business.
+- Rimosse le pagine segnaposto (Analisi, Report, Obiettivi, Investimenti, Patrimonio).
+- Accesso privato: Next.js solo su `127.0.0.1`, telefono via `tailscale serve`,
+  `Avvia Finanze.cmd`, regola firewall per le porte del database, PWA
+  installabile (docs/accesso-privato.md).
+
+**Database**: nessuna migration.

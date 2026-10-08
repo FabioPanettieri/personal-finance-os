@@ -74,7 +74,7 @@ export async function commitImportAction(importId: string): Promise<ImportFormSt
   revalidatePath('/imports')
   revalidatePath(`/imports/${importId}`)
   revalidatePath('/accounts', 'layout')
-  revalidatePath('/net-worth')
+  revalidatePath('/')
   return { status: 'idle', message: `Importate ${result.value.imported} righe.` }
 }
 

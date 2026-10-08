@@ -13,12 +13,18 @@ Next.js 16 (App Router, Server Actions, `proxy.ts`) · React 19 · TypeScript 6
 strict · Tailwind CSS 4 · Supabase (Postgres, Auth con TOTP obbligatorio,
 Storage, RLS) · Vitest · Playwright.
 
+## Uso quotidiano (Windows)
+
+Apri Docker Desktop e fai doppio clic su **`Avvia Finanze.cmd`**. L'app
+ascolta solo su `127.0.0.1`: non è raggiungibile da Internet. Per usarla dal
+telefono (Tailscale) e installarla come app: [docs/accesso-privato.md](docs/accesso-privato.md).
+
 ## Avvio in locale
 
 ```bash
 npm install
 cp .env.example .env.local   # compila NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-npm run dev                  # http://localhost:3000
+npm run dev                  # http://127.0.0.1:3000
 ```
 
 Senza variabili Supabase l'app parte comunque, ma resta chiusa: il login
@@ -31,7 +37,7 @@ Richiede Docker. Nessun progetto cloud, nessun dato reale.
 ```bash
 npx supabase start        # Postgres + Auth + PostgREST + Storage + Studio, migration applicate
 npm run env:local         # crea .env.local con URL e publishable key LOCALI
-npm run dev               # http://localhost:3000
+npm run dev               # http://127.0.0.1:3000
 ```
 
 Crea l'utente da Studio locale (http://127.0.0.1:55323 → Authentication →
@@ -55,7 +61,8 @@ riapplica le migration da zero; `npm run db:stop` ferma lo stack.
 | Comando | Descrizione |
 |---|---|
 | `npm run dev` | Server di sviluppo |
-| `npm run build` / `npm start` | Build e avvio di produzione |
+| `npm run build` / `npm start` | Build e avvio di produzione (solo 127.0.0.1:3000) |
+| `npm run app` | Build + avvio in un comando |
 | `npm run typecheck` | TypeScript |
 | `npm run lint` | ESLint (zero warning) |
 | `npm test` | Test unitari e di componente |

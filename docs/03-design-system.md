@@ -1,5 +1,25 @@
 # 03 — Design System
 
+> **Redesign "scuro premium" (dopo lo Sprint 4)** — prevale su quanto segue
+> dove in conflitto. Mockup approvati in Figma (file `iTFdPZJIhQyqta1b5RxJBw`).
+>
+> - **Tema scuro di default** (`DEFAULT_THEME_PREFERENCE = 'dark'`), chiaro
+>   disponibile. Canvas `#0a0b0f`, surface `#13151b`, surface-2 `#1a1d25`,
+>   testo `#f3f4f6`; l'azione primaria è bianca su scuro.
+> - **Colori delle banche** (token `--bank-revolut`, `--bank-ing`, `--bank-tr`,
+>   validati per daltonismo): Revolut viola `#9F53F0`, ING arancione `#E2560A`,
+>   Trade Republic blu `#2CA0D4` (in chiaro `#8E44EC`, `#E35D0F`, `#1C8DC4`).
+>   Il colore segue la banca (`lib/banks.ts`), non il conto: tutti i conti ING
+>   sono arancioni. Le tre banche hanno "carte" sfumate (`BankCard`), gli altri
+>   conti righe con barretta colorata (`AccountRow`).
+> - **Navigazione a 5 voci**: Home, Movimenti, Importa (il "+" centrale),
+>   Conti, Business. Impostazioni dall'icona in alto (mobile) o in basso nella
+>   sidebar (desktop).
+> - **Linguaggio semplice**: "Ti restano", "Da sistemare", "Dove vanno i soldi".
+>   Un movimento si sistema con due tocchi (scelte rapide,
+>   `lib/transactions/quick-choices.ts`) e "Ricorda" crea una regola.
+> - Raggi: controlli 12px, card 20px. App installabile (manifest + icone).
+
 Carattere: **premium, minimal, tecnico, data-driven**. Lo strumento di un
 ingegnere che tiene ai numeri: superfici calme, tipografia precisa, colore
 usato solo per significato.

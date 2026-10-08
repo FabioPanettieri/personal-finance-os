@@ -22,6 +22,7 @@ test('ING: anteprima, righe da verificare, correzione, esclusione, conferma e re
   await expect(page.getByRole('heading', { name: 'Nessuna importazione' })).toBeVisible()
   await page.getByRole('link', { name: 'Importa CSV' }).first().click()
   await expect(page).toHaveURL('/imports/new')
+  await page.screenshot({ path: `tests/e2e/screenshots/local-import-new-${testInfo.project.name}.png`, fullPage: true })
 
   // ING preselezionata, conto ING Direct proposto.
   await expect(page.getByLabel('Conto di destinazione')).toHaveValue(

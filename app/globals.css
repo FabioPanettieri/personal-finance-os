@@ -29,31 +29,39 @@
   /* Serie dei grafici (identità, non stato): validate per daltonismo, light. */
   --chart-income: #4f5bd5;
   --chart-expense: #e8853b;
+  /* Colori delle banche (identità): validati per daltonismo, light. */
+  --bank-revolut: #8e44ec;
+  --bank-ing: #e35d0f;
+  --bank-tr: #1c8dc4;
 }
 
 [data-theme='dark'] {
   color-scheme: dark;
-  --canvas: #0b0d10;
-  --surface: #12151a;
-  --surface-2: #181c22;
-  --line: #232830;
-  --line-strong: #2f3540;
-  --fg: #eceef2;
-  --fg-muted: #8a93a3;
-  --fg-subtle: #5f6878;
-  --accent: #7c86f0;
-  --accent-fg: #0b0d10;
-  --accent-soft: #1c1f3a;
-  --positive: #3dd68c;
-  --positive-soft: #0f2a1e;
-  --negative: #ff6369;
-  --negative-soft: #331517;
-  --warning: #f5b544;
-  --warning-soft: #33260f;
+  /* Scuro premium (mockup Figma "Finance OS — Redesign"). */
+  --canvas: #0a0b0f;
+  --surface: #13151b;
+  --surface-2: #1a1d25;
+  --line: #252935;
+  --line-strong: #343947;
+  --fg: #f3f4f6;
+  --fg-muted: #9aa1ae;
+  --fg-subtle: #6b7280;
+  --accent: #f3f4f6;
+  --accent-fg: #0a0b0f;
+  --accent-soft: #1f232d;
+  --positive: #34d399;
+  --positive-soft: #0f2a21;
+  --negative: #f87171;
+  --negative-soft: #331a1c;
+  --warning: #fbbf24;
+  --warning-soft: #2b2310;
   --shadow-card: none;
   /* Stesse serie, gradini per la superficie scura (validate separatamente). */
   --chart-income: #7c86f0;
   --chart-expense: #cf7230;
+  --bank-revolut: #9f53f0;
+  --bank-ing: #e2560a;
+  --bank-tr: #2ca0d4;
 }
 
 @theme inline {
@@ -76,12 +84,15 @@
   --color-warning-soft: var(--warning-soft);
   --color-chart-income: var(--chart-income);
   --color-chart-expense: var(--chart-expense);
+  --color-bank-revolut: var(--bank-revolut);
+  --color-bank-ing: var(--bank-ing);
+  --color-bank-tr: var(--bank-tr);
 
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
 
-  --radius-control: 8px;
-  --radius-card: 14px;
+  --radius-control: 12px;
+  --radius-card: 20px;
   --radius-sheet: 20px;
 
   --shadow-card: var(--shadow-card);

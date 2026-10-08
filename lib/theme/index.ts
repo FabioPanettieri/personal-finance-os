@@ -12,6 +12,9 @@ export function resolveTheme(preference: ThemePreference, prefersDark: boolean):
   return preference
 }
 
+/** Senza una scelta salvata l'app è scura (stile "scuro premium"). */
+export const DEFAULT_THEME_PREFERENCE: ThemePreference = 'dark'
+
 export function nextThemePreference(current: ThemePreference): ThemePreference {
   return current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system'
 }
@@ -20,4 +23,4 @@ export function nextThemePreference(current: ThemePreference): ThemePreference {
  * Script inline eseguito prima del primo paint (con nonce CSP) per evitare il
  * lampo di tema sbagliato. Deve restare autonomo: niente import.
  */
-export const THEME_INIT_SCRIPT = `(function(){try{var p=localStorage.getItem('${THEME_STORAGE_KEY}');if(p!=='light'&&p!=='dark')p='system';var d=p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}})();`
+export const THEME_INIT_SCRIPT = `(function(){try{var p=localStorage.getItem('${THEME_STORAGE_KEY}');if(p!=='light'&&p!=='dark'&&p!=='system')p='dark';var d=p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`
