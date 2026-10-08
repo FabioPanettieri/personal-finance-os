@@ -38,6 +38,27 @@ Per questo basta esporre l'app, e solo dentro la tua rete Tailscale.
 2. Doppio clic su **`Avvia Finanze.cmd`** nella cartella del progetto.
 3. Apri `https://nome-pc.tuo-tailnet.ts.net` (dal PC puoi usare anche `http://127.0.0.1:3000`).
 
+## Avvio automatico (consigliato)
+
+Finanze si accende da solo quando accedi a Windows, in background, senza finestre.
+Serve che Docker Desktop parta con Windows (Docker Desktop → Settings →
+General → *Start Docker Desktop when you sign in*).
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\windows\attiva-avvio-automatico.ps1
+```
+
+- Registro dell'avvio: `%LOCALAPPDATA%\Finanze\avvio.log`.
+- Per spegnerlo e togliere l'avvio automatico:
+  `powershell -ExecutionPolicy Bypass -File scripts\windows\disattiva-avvio-automatico.ps1`.
+- Dopo un aggiornamento del codice: disattiva, avvia una volta `Avvia Finanze.cmd`
+  (rifà la build), chiudilo e riattiva l'avvio automatico dalla cartella nuova.
+
+## Installa l'app sul PC
+
+Apri l'indirizzo `.ts.net` in Chrome (icona *Installa* nella barra degli
+indirizzi) o in Edge (menu … → *App* → *Installa questo sito come app*).
+
 ## Installa l'app sul telefono
 
 - **Android (Chrome)**: apri l'indirizzo `.ts.net` → menu ⋮ → *Installa app*.
