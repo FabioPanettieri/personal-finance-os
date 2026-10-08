@@ -30,6 +30,8 @@ for ($i = 0; $i -lt 3; $i++) {
   if ($LASTEXITCODE -eq 0) { break }
   Start-Sleep -Seconds 10
 }
+# Aggiornamenti del database (solo le migration nuove, i dati restano).
+npx.cmd supabase migration up --local
 if (-not (Test-Path '.env.local')) { npm.cmd run env:local }
 if (-not (Test-Path 'node_modules')) { npm.cmd ci }
 # La build si rifà solo se manca (dopo un aggiornamento la fa "Avvia Finanze").

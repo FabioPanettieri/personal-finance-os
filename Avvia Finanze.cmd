@@ -9,6 +9,9 @@ echo  Finanze - avvio
 echo  1/3  Database locale (Docker Desktop deve essere aperto)...
 call npx supabase start
 if errorlevel 1 goto errore
+rem Aggiornamenti del database (solo le migration nuove, i dati restano).
+call npx supabase migration up --local
+if errorlevel 1 goto errore
 if not exist .env.local call npm run env:local
 if errorlevel 1 goto errore
 if not exist node_modules call npm ci
