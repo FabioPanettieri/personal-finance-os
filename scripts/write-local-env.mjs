@@ -22,4 +22,4 @@ if (existsSync('.env.local') && !process.argv.includes('--force')) {
   process.exit(1)
 }
 writeFileSync('.env.local', `NEXT_PUBLIC_SUPABASE_URL=${status.API_URL}\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${status.PUBLISHABLE_KEY}\n`)
-console.log(`✓ .env.local creato (Supabase locale su ${status.API_URL}). Studio: ${status.STUDIO_URL ?? 'http://127.0.0.1:54323'}`)
+console.log(`✓ .env.local creato (Supabase locale su ${status.API_URL}). Studio: ${status.STUDIO_URL ?? 'http://127.0.0.1:55323'}`)

@@ -34,7 +34,7 @@ npm run env:local         # crea .env.local con URL e publishable key LOCALI
 npm run dev               # http://localhost:3000
 ```
 
-Crea l'utente da Studio locale (http://127.0.0.1:54323 → Authentication →
+Crea l'utente da Studio locale (http://127.0.0.1:55323 → Authentication →
 Users → *Add user*, con *Auto Confirm User*) oppure con l'Admin API usando la
 secret key **locale**. `npm run db:start` avvia lo stack senza Studio (CI e test). `npm run db:reset`
 riapplica le migration da zero; `npm run db:stop` ferma lo stack.

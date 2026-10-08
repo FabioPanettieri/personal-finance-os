@@ -9,7 +9,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PG_BIN="${PG_BIN:-$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1)}"
-PORT="${PG_TEST_PORT:-54329}"
+PORT="${PG_TEST_PORT:-55330}"
 
 if [[ ! -x "$PG_BIN/initdb" ]]; then
   echo "initdb non trovato: imposta PG_BIN" >&2

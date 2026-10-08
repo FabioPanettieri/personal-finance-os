@@ -5,12 +5,33 @@
 
 project_id = "personal-finance-os"
 
+# Porte 553xx (non le 543xx predefinite): così questo stack locale può girare
+# insieme ad altri progetti Supabase sulla stessa macchina.
+
 [api]
+port = 55321
 schemas = ["public"]
 extra_search_path = ["public", "extensions"]
 
 [db]
+port = 55322
+shadow_port = 55320
 major_version = 17
+
+[db.pooler]
+port = 55329
+
+[studio]
+port = 55323
+
+[local_smtp]
+port = 55324
+
+[analytics]
+port = 55327
+
+[edge_runtime]
+inspector_port = 8183
 
 [db.seed]
 enabled = false
