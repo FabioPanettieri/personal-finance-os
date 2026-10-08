@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
   // Build separata per i test E2E (puntano a un finto Supabase): non tocca .next.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   poweredByHeader: false,
+  // La radice è sempre la cartella del progetto, anche se esiste un
+  // package-lock.json in una cartella superiore (es. la home dell'utente).
+  turbopack: { root: import.meta.dirname },
+  outputFileTracingRoot: import.meta.dirname,
   experimental: {
     // CSV fino a 10 MB (limite del bucket) + margine per il multipart.
     // allowedOrigins: l'app si apre anche dal nome Tailscale del PC

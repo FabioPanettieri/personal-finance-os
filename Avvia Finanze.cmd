@@ -11,7 +11,7 @@ if not exist .env.local call npm run env:local
 if errorlevel 1 goto errore
 if not exist node_modules call npm ci
 if errorlevel 1 goto errore
-echo  2/3  Preparo lapp (circa un minuto)...
+echo  2/3  Preparo l'app (circa un minuto)...
 call npm run build
 if errorlevel 1 goto errore
 echo.
