@@ -316,6 +316,7 @@ select tests.ok(
   (select sum(balance_cents) from public.account_balances) = 145050,
   'il trasferimento sposta saldo tra conti senza cambiare il totale');
 
+
 -- Categorie, investimenti ---------------------------------------------------
 
 select tests.throws(
@@ -461,6 +462,53 @@ select tests.ok((select count(*) from removed) = 1, 'AAL2: DELETE transactions c
 -- =============================================================================
 -- Verifiche lato superuser su ciò che A ha tentato
 -- =============================================================================
+
+
+-- 0008: collegamento manuale e integrità dei trasferimenti
+insert into public.transactions (account_id, booked_on, description, original_description, amount_cents, type, nature, fingerprint)
+values
+  (:'a_ing', '2026-09-20', 'Verso Revolut', 'BONIFICO', -2000, 'transfer', 'transfer', tests.fp('l-1')),
+  (:'a_rev', '2026-09-21', 'Ricarica',      'TOP-UP',    2000, 'income',   'personal', tests.fp('l-2')),
+  (:'a_tr',  '2026-09-21', 'Versamento',    'DEPOSIT',   3000, 'transfer', 'transfer', tests.fp('l-3')),
+  (:'a_rev', '2026-09-21', 'Verso TR',      'TO TR',    -3000, 'transfer', 'transfer', tests.fp('l-4'));
+select id as l1 from public.transactions where fingerprint = tests.fp('l-1') \gset
+select id as l2 from public.transactions where fingerprint = tests.fp('l-2') \gset
+select id as l3 from public.transactions where fingerprint = tests.fp('l-3') \gset
+select id as l4 from public.transactions where fingerprint = tests.fp('l-4') \gset
+
+select public.link_transfer(:'l1', :'l2') as l_group \gset
+select tests.ok(
+  (select count(*) = 2 and sum(amount_cents) = 0 and bool_and(type = 'transfer' and nature = 'transfer' and is_categorized)
+   from public.transactions where transfer_group_id = :'l_group'),
+  '0008: link_transfer collega due metà opposte e le rende giroconto (anche se una era un''entrata)');
+select tests.ok(
+  (select kind = 'internal' and detected_by = 'manual' from public.transfer_groups where id = :'l_group'),
+  '0008: gruppo manuale di tipo interno');
+select tests.throws(format('select public.link_transfer(%L, %L)', :'l1', :'l4'), '23514', '0008: un movimento già collegato non si ricollega');
+select tests.throws(format('select public.link_transfer(%L, %L)', :'l3', :'l2'), '23514', '0008: importi non opposti rifiutati');
+select tests.throws(format('select public.link_transfer(%L, %L)', :'l2', :'l4'), '23514', '0008: stesso conto rifiutato');
+select tests.throws(
+  format($$update public.transactions set transfer_group_id = %L where id = %L$$, :'l_group', :'l4'),
+  '23514', '0008: un gruppo non accetta una terza metà');
+select tests.throws(
+  format($$update public.transactions set type = 'expense', nature = 'personal' where id = %L$$, :'l1'),
+  '23514', '0008: una metà collegata non può diventare una spesa');
+
+select public.link_transfer(:'l4', :'l3') as l_inv \gset
+select tests.ok(
+  (select bool_and(type = 'investment' and nature = 'investment') from public.transactions where transfer_group_id = :'l_inv')
+  and (select kind = 'investment' from public.transfer_groups where id = :'l_inv'),
+  '0008: verso il broker diventa versamento (investimento)');
+
+select tests.ok(public.unlink_transfer(:'l_group') = 2, '0008: unlink_transfer scollega le due metà');
+select tests.ok(
+  (select count(*) from public.transactions where id in (:'l1', :'l2') and transfer_group_id is null and type = 'transfer') = 2
+  and not exists (select 1 from public.transfer_groups where id = :'l_group'),
+  '0008: dopo lo scollegamento restano trasferimenti da abbinare, il gruppo è eliminato');
+select tests.throws(format('select public.unlink_transfer(%L)', :'l_group'), 'P0002', '0008: gruppo inesistente');
+
+select public.unlink_transfer(:'l_inv');
+delete from public.transactions where id in (:'l1', :'l2', :'l3', :'l4');
 
 reset role;
 

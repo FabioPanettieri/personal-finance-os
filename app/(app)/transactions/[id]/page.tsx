@@ -7,6 +7,7 @@ import { z } from 'zod'
 
 import { Money } from '@/components/ui/money'
 import { QuickClassify } from '@/features/transactions/components/quick-classify'
+import { TransferCandidates, UnlinkTransferButton } from '@/features/transactions/components/transfer-actions'
 import { NATURE_LABELS, SOURCE_LABELS, TYPE_LABELS } from '@/features/transactions/labels'
 import { accountColor } from '@/lib/banks'
 import { formatIsoDate } from '@/lib/dates'
@@ -14,6 +15,7 @@ import { choicesFor } from '@/lib/transactions/quick-choices'
 import { cn } from '@/lib/utils/cn'
 import { requireUser } from '@/server/auth/session'
 import { getTransaction } from '@/server/repositories/transactions'
+import { transferCandidates } from '@/server/repositories/transfers'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 
 export const metadata: Metadata = { title: 'Movimento' }
@@ -33,8 +35,10 @@ export default async function TransactionPage({ params }: { params: Promise<{ id
   const { id } = await params
   await requireUser(`/transactions/${id}`)
   if (!z.uuid().safeParse(id).success) notFound()
-  const t = await getTransaction(await createSupabaseServerClient(), id)
+  const db = await createSupabaseServerClient()
+  const t = await getTransaction(db, id)
   if (!t) notFound()
+  const candidates = t.transferGroupId ? [] : await transferCandidates(db, t.id)
   const internal = t.type === 'transfer' || t.type === 'investment'
   const color = accountColor({ name: t.account.name, institution: t.account.institution })
   const currentLabel = [TYPE_LABELS[t.type], t.business ?? t.category].filter(Boolean).join(' · ')
@@ -102,27 +106,38 @@ export default async function TransactionPage({ params }: { params: Promise<{ id
         </dl>
       </section>
 
-      {internal ? (
+      {internal || candidates.length > 0 ? (
         <section aria-label="Trasferimento" className="mb-6 rounded-[var(--radius-card)] border border-line bg-surface p-5">
           <h2 className="mb-2 flex items-center gap-2 text-[15px] font-semibold text-fg">
-            <ArrowLeftRight aria-hidden className="size-4" /> Trasferimento
+            <ArrowLeftRight aria-hidden className="size-4" /> {internal ? 'Trasferimento' : 'È un trasferimento tra i tuoi conti?'}
           </h2>
           {t.transferLegs.length > 0 ? (
-            <ul className="divide-y divide-line">
-              {t.transferLegs.map((leg) => (
-                <li key={leg.id}>
-                  <Link href={`/transactions/${leg.id}`} className="flex items-center justify-between gap-3 py-3 text-[15px] hover:text-fg-muted">
-                    <span>
-                      {leg.accountName} · {formatIsoDate(leg.bookedOn)}
-                    </span>
-                    <Money value={leg.amount} currency={t.currency} signDisplay="exceptZero" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <>
+              <p className="mb-1 text-sm text-fg-muted">Soldi spostati tra i tuoi conti: non conta né come entrata né come spesa.</p>
+              <ul className="divide-y divide-line">
+                {t.transferLegs.map((leg) => (
+                  <li key={leg.id}>
+                    <Link href={`/transactions/${leg.id}`} className="flex items-center justify-between gap-3 py-3 text-[15px] hover:text-fg-muted">
+                      <span>
+                        {leg.accountName} · {formatIsoDate(leg.bookedOn)}
+                      </span>
+                      <Money value={leg.amount} currency={t.currency} signDisplay="exceptZero" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {t.transferGroupId ? <UnlinkTransferButton id={t.id} groupId={t.transferGroupId} /> : null}
+            </>
+          ) : candidates.length > 0 ? (
+            <>
+              <p className="mb-3 text-sm text-fg-muted">
+                {internal ? 'Trovato un movimento opposto su un altro conto. È l’altra metà?' : 'C’è un movimento opposto su un altro tuo conto: se sono soldi spostati, collegali.'}
+              </p>
+              <TransferCandidates id={t.id} currency={t.currency} candidates={candidates} />
+            </>
           ) : (
             <p className="text-sm text-fg-muted">
-              L’altra metà verrà collegata quando importi l’estratto dell’altro conto. Non conta né come entrata né come spesa.
+              L’altra metà verrà collegata quando importi l’estratto dell’altro conto. Intanto non conta né come entrata né come spesa.
             </p>
           )}
         </section>

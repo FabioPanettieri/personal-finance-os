@@ -1639,6 +1639,7 @@ export type Database = {
           refund_cents: number
         }[]
       }
+      link_transfer: { Args: { p_first: string; p_second: string }; Returns: string }
       net_worth_history: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1649,6 +1650,7 @@ export type Database = {
       }
       seed_default_data: { Args: { p_user_id: string }; Returns: undefined }
       seed_import_defaults: { Args: { p_user_id: string }; Returns: undefined }
+      unlink_transfer: { Args: { p_group: string }; Returns: number }
     }
     Enums: {
       audit_action: 'insert' | 'update' | 'delete'

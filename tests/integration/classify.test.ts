@@ -43,7 +43,7 @@ afterAll(async () => {
 describe('classifyTransaction', () => {
   it('una spesa diventa spesa VOXEL Studio e la regola viene ricordata', async () => {
     const id = await insertTx(a, -2590, 'Filamento PLA Shop')
-    expect(await classifyTransaction(a.client, id, 'voxel-expense', true)).toEqual({ ok: true, ruleCreated: true })
+    expect(await classifyTransaction(a.client, id, 'voxel-expense', true)).toEqual({ ok: true, ruleCreated: true, linked: false })
 
     const { data: tx } = await admin
       .from('transactions')
@@ -67,7 +67,7 @@ describe('classifyTransaction', () => {
 
   it('entrata personale con fonte; "Dai miei conti" non è un’entrata', async () => {
     const salary = await insertTx(a, 180000, 'Stipendio settembre')
-    expect(await classifyTransaction(a.client, salary, 'salary', false)).toEqual({ ok: true, ruleCreated: false })
+    expect(await classifyTransaction(a.client, salary, 'salary', false)).toEqual({ ok: true, ruleCreated: false, linked: false })
     const { data: s } = await admin.from('transactions').select('type, income_sources(name)').eq('id', salary).single()
     expect(s).toMatchObject({ type: 'income', income_sources: { name: 'Stipendio' } })
 

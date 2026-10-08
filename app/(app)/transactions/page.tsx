@@ -11,6 +11,7 @@ import { requireUser } from '@/server/auth/session'
 import { listAccounts } from '@/server/repositories/accounts'
 import { businessList, categoryTree, incomeSourceList, reviewCounts } from '@/server/repositories/dashboard'
 import { listTransactions, type TransactionListItem } from '@/server/repositories/transactions'
+import { unmatchedTransferCount } from '@/server/repositories/transfers'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 
 export const metadata: Metadata = { title: 'Movimenti' }
@@ -40,12 +41,13 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   await requireUser('/transactions')
   const filters = parseTransactionFilters(await searchParams)
   const db = await createSupabaseServerClient()
-  const [accounts, tree, businesses, sources, review] = await Promise.all([
+  const [accounts, tree, businesses, sources, review, unmatched] = await Promise.all([
     listAccounts(db),
     categoryTree(db),
     businessList(db),
     incomeSourceList(db),
     reviewCounts(db),
+    unmatchedTransferCount(db),
   ])
 
   // Una macro-categoria comprende le sue sottocategorie (come nella Home).
@@ -71,7 +73,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
     })
 
   const withFilters = (patch: Partial<TransactionFilters>) => transactionsHref({ ...filters, page: 1, ...patch })
-  const allActive = !filters.review && !filters.accountId
+  const allActive = !filters.review && !filters.unmatched && !filters.accountId
 
   return (
     <>
@@ -81,7 +83,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
       </header>
 
       <form method="get" action="/transactions" className="mb-4">
-        {Object.entries({ from: filters.from, to: filters.to, type: filters.type, account: filters.accountId, category: filters.categoryId, business: filters.businessId, source: filters.incomeSourceId, status: filters.review ? 'review' : null })
+        {Object.entries({ from: filters.from, to: filters.to, type: filters.type, account: filters.accountId, category: filters.categoryId, business: filters.businessId, source: filters.incomeSourceId, status: filters.review ? 'review' : filters.unmatched ? 'unmatched' : null })
           .filter(([, v]) => v)
           .map(([k, v]) => (
             <input key={k} type="hidden" name={k} value={v!} />
@@ -101,13 +103,19 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
       </form>
 
       <nav aria-label="Filtri rapidi" className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-        <Link href={withFilters({ review: false, accountId: null })} aria-current={allActive ? 'page' : undefined} className={chip(allActive)}>
+        <Link href={withFilters({ review: false, unmatched: false, accountId: null })} aria-current={allActive ? 'page' : undefined} className={chip(allActive)}>
           Tutti
         </Link>
-        <Link href={withFilters({ review: !filters.review })} aria-current={filters.review ? 'page' : undefined} className={chip(filters.review)}>
+        <Link href={withFilters({ review: !filters.review, unmatched: false })} aria-current={filters.review ? 'page' : undefined} className={chip(filters.review)}>
           <span aria-hidden className="size-2 rounded-full bg-warning" />
           Da sistemare{review.transactions > 0 ? ` · ${review.transactions}` : ''}
         </Link>
+        {unmatched > 0 || filters.unmatched ? (
+          <Link href={withFilters({ unmatched: !filters.unmatched, review: false })} aria-current={filters.unmatched ? 'page' : undefined} className={chip(filters.unmatched)}>
+            <span aria-hidden className="size-2 rounded-full bg-fg-muted" />
+            Da abbinare{unmatched > 0 ? ` · ${unmatched}` : ''}
+          </Link>
+        ) : null}
         {accounts
           .filter((a) => a.isActive || a.transactionCount > 0)
           .map((a) => (
@@ -143,9 +151,9 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
 
       {result.items.length === 0 ? (
         <div className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-6 py-14 text-center">
-          <p className="text-base font-semibold text-fg">{filters.review ? 'Niente da sistemare' : 'Nessun movimento'}</p>
+          <p className="text-base font-semibold text-fg">{filters.review ? 'Niente da sistemare' : filters.unmatched ? 'Niente da abbinare' : 'Nessun movimento'}</p>
           <p className="mt-1 text-sm text-fg-muted">
-            {filters.review ? 'Tutti i movimenti sono classificati.' : extra.length > 0 || filters.query ? 'Nessun movimento corrisponde ai filtri.' : 'Importa un estratto per iniziare.'}
+            {filters.review ? 'Tutti i movimenti sono classificati.' : filters.unmatched ? 'Ogni trasferimento ha la sua altra metà.' : extra.length > 0 || filters.query ? 'Nessun movimento corrisponde ai filtri.' : 'Importa un estratto per iniziare.'}
           </p>
         </div>
       ) : (

@@ -89,6 +89,11 @@ erDiagram
     "da categorizzare" e indice trigram per la ricerca testuale.
 - **transfer_groups** — lega le gambe di un movimento interno (`internal`) o
   verso investimenti (`investment`); `detected_by` auto/manual + confidenza.
+  Dalla 0008: al massimo due metà per gruppo, su conti diversi, stessa valuta,
+  somma zero (trigger `check_transfer_group`); solo `transfer`/`investment`
+  possono stare in un gruppo (check `transactions_transfer_group_internal`).
+  `link_transfer(a, b)` e `unlink_transfer(gruppo)` (SECURITY INVOKER, RLS +
+  AAL2) collegano e scollegano in modo atomico.
 
 ### Import
 - **import_profiles** — mapping per banca (encoding, delimitatore, formato data,

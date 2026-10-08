@@ -19,6 +19,8 @@ export type TransactionRowData = {
   categoryName: string | null
   businessName: string | null
   isCategorized: boolean
+  /** Solo per i trasferimenti: false = l'altra metà non è ancora collegata. */
+  isTransferLinked?: boolean
 }
 
 const ICONS = { income: ArrowDownLeft, expense: ArrowUpRight, refund: RotateCcw, transfer: ArrowLeftRight, investment: LineChart }
@@ -47,6 +49,8 @@ export function TransactionRow({ tx, showDate = false }: { tx: TransactionRowDat
         <span className="block truncate text-[13px] text-fg-muted">
           {!tx.isCategorized ? (
             <span className="font-medium text-warning">Da sistemare · </span>
+          ) : internal && tx.isTransferLinked === false ? (
+            <span className="font-medium text-fg">Da abbinare · </span>
           ) : null}
           {[tx.accountName, detail, showDate ? formatIsoDate(tx.bookedOn) : null].filter(Boolean).join(' · ')}
         </span>

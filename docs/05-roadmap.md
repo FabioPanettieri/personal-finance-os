@@ -262,3 +262,31 @@ Su richiesta: app più chiara e accattivante, solo su PC e telefono.
   installabile (docs/accesso-privato.md).
 
 **Database**: nessuna migration.
+
+## SPRINT 5 — COMPLETED (Transfers)
+
+Il rilevamento automatico durante l'import esisteva dallo Sprint 3 Hardening
+(`lib/transfers/detect.ts`, metà speculari per conto deposito e carta). Lo
+Sprint 5 aggiunge integrità e controllo manuale.
+
+**Implemented**
+- Migration 0008: vincolo "due metà opposte su conti diversi" nel database,
+  `link_transfer` / `unlink_transfer` atomiche (SECURITY INVOKER).
+- Dettaglio movimento: "È l'altra metà?" con i candidati (importo opposto,
+  altro conto, ±7 giorni, prima quelli già trasferimenti) e pulsante Collega;
+  "scollega" per le coppie sbagliate. Anche un'entrata/spesa può essere
+  collegata se in realtà era un giroconto.
+- "Verso i miei conti" / "Dai miei conti" collega da solo se c'è un solo
+  candidato già riconosciuto come trasferimento; riclassificare una metà come
+  entrata o spesa scioglie il trasferimento.
+- Movimenti: filtro "Da abbinare" (trasferimenti senza l'altra metà).
+- Verso un conto di investimento il collegamento diventa "versamento".
+
+**Acceptance**: test di integrazione ING ↔ Revolut ↔ Trade Republic — il
+patrimonio resta identico prima e dopo ogni collegamento/scollegamento, le
+entrate scendono quando una ricarica viene riconosciuta come giroconto.
+
+**Database**: migration 0008 (vincoli + 2 funzioni, nessuna tabella).
+
+**Da ricordare all'utente**: backup automatico del database locale
+(rimandato su richiesta, da proporre al prossimo report).

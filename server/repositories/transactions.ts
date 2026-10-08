@@ -7,6 +7,7 @@ import { typesFor, type TransactionFilters } from '@/lib/transactions/filters'
 import { findChoice } from '@/lib/transactions/quick-choices'
 
 import { RepositoryError, type DbClient } from './accounts'
+import { linkTransfer, transferCandidates, unlinkTransfer } from './transfers'
 
 /**
  * Movimenti: lista filtrata (a pagine), dettaglio e conferma della
@@ -70,6 +71,7 @@ export async function listTransactions(
   if (filters.incomeSourceId === 'none') query = query.is('income_source_id', null).eq('type', 'income')
   else if (filters.incomeSourceId) query = query.eq('income_source_id', filters.incomeSourceId)
   if (filters.review) query = query.eq('is_categorized', false)
+  if (filters.unmatched) query = query.in('type', ['transfer', 'investment']).is('transfer_group_id', null)
   if (filters.query) {
     // Ricerca semplice sulla descrizione; i caratteri jolly digitati sono trattati come testo.
     const escaped = filters.query.replace(/[\\%_]/g, (c) => `\\${c}`)
@@ -132,6 +134,8 @@ export type TransactionDetail = {
   ruleName: string | null
   source: string
   importInfo: { id: string; bankProfile: string; createdAt: string } | null
+  /** Gruppo del trasferimento (null se non collegato). */
+  transferGroupId: string | null
   /** Altre gambe dello stesso trasferimento. */
   transferLegs: { id: string; accountName: string; amount: Cents; bookedOn: IsoDate }[]
 }
@@ -203,6 +207,7 @@ export async function getTransaction(db: DbClient, id: string): Promise<Transact
     ruleName: row.categorization_rules?.name ?? null,
     source: row.source,
     importInfo: row.imports ? { id: row.imports.id, bankProfile: row.imports.bank_profile, createdAt: row.imports.created_at } : null,
+    transferGroupId: row.transfer_group_id,
     transferLegs: legs,
   }
 }
@@ -245,7 +250,7 @@ export async function confirmTransaction(db: DbClient, id: string): Promise<bool
   return data.length === 1
 }
 
-export type ClassifyResult = { ok: true; ruleCreated: boolean } | { ok: false; error: string }
+export type ClassifyResult = { ok: true; ruleCreated: boolean; linked: boolean } | { ok: false; error: string }
 
 /**
  * "Sistema" un movimento con una scelta rapida: imposta tipo, natura,
@@ -275,6 +280,12 @@ export async function classifyTransaction(db: DbClient, id: string, choiceKey: s
   const incomeSourceId = choice.type === 'income' ? (source.data?.id ?? null) : null
   const internal = choice.type === 'transfer' || choice.type === 'investment'
 
+  // Non è più un trasferimento: si scioglie il gruppo (l'altra metà resta "da abbinare").
+  if (!internal && tx.transfer_group_id) {
+    const unlinked = await unlinkTransfer(db, tx.transfer_group_id)
+    if (!unlinked.ok) return unlinked
+  }
+
   const { error: updateError } = await db
     .from('transactions')
     .update({
@@ -287,8 +298,6 @@ export async function classifyTransaction(db: DbClient, id: string, choiceKey: s
       categorization_method: 'manual',
       categorization_confidence: 1,
       categorization_rule_id: null,
-      // Un movimento che non è più un trasferimento esce dal gruppo.
-      ...(internal ? {} : { transfer_group_id: null }),
     })
     .eq('id', id)
   if (updateError) fail('Aggiornamento movimento', updateError)
@@ -320,5 +329,13 @@ export async function classifyTransaction(db: DbClient, id: string, choiceKey: s
     if (result.error) fail('Salvataggio regola', result.error)
     ruleCreated = true
   }
-  return { ok: true, ruleCreated }
+  // È un trasferimento senza l'altra metà: se c'è un solo candidato già
+  // classificato come trasferimento, si collega subito.
+  let linked = false
+  if (internal && !tx.transfer_group_id) {
+    const candidates = await transferCandidates(db, id)
+    const internalCandidates = candidates.filter((c) => c.type === 'transfer' || c.type === 'investment')
+    if (candidates.length === 1 && internalCandidates.length === 1) linked = (await linkTransfer(db, id, internalCandidates[0]!.id)).ok
+  }
+  return { ok: true, ruleCreated, linked }
 }

@@ -33,6 +33,8 @@ export type TransactionFilters = {
   incomeSourceId: string | null
   /** Solo movimenti con classificazione non confermata. */
   review: boolean
+  /** Solo trasferimenti/versamenti senza l'altra metà collegata. */
+  unmatched: boolean
   query: string | null
   page: number
 }
@@ -68,6 +70,7 @@ export function parseTransactionFilters(params: Params): TransactionFilters {
     businessId: idOrNone(first(params, 'business')) === 'none' ? null : idOrNone(first(params, 'business')),
     incomeSourceId: idOrNone(first(params, 'source')),
     review: first(params, 'status') === 'review',
+    unmatched: first(params, 'status') === 'unmatched',
     query: query ? query.slice(0, 100) : null,
     page: Number.isInteger(page) && page >= 1 && page <= 10_000 ? page : 1,
   }
@@ -84,6 +87,7 @@ export function transactionsHref(filters: Partial<Omit<TransactionFilters, 'page
   if (filters.businessId) params.set('business', filters.businessId)
   if (filters.incomeSourceId) params.set('source', filters.incomeSourceId)
   if (filters.review) params.set('status', 'review')
+  else if (filters.unmatched) params.set('status', 'unmatched')
   if (filters.query) params.set('q', filters.query)
   if (filters.page && filters.page > 1) params.set('page', String(filters.page))
   const search = params.toString()
