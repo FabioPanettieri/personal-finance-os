@@ -13,7 +13,7 @@ export type NavItem = {
 
 /** Cinque voci, uguali su desktop (sidebar) e mobile (barra in basso). */
 export const PRIMARY_NAV: readonly NavItem[] = [
-  { href: '/', label: 'Home', icon: House },
+  { href: '/', label: 'Home', icon: House, matches: ['/reports'] },
   { href: '/transactions', label: 'Movimenti', icon: ArrowLeftRight },
   { href: '/imports/new', label: 'Importa', icon: Plus, primary: true, matches: ['/imports'] },
   { href: '/accounts', label: 'Conti', icon: Landmark, matches: ['/investments'] },

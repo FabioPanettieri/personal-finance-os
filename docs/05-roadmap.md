@@ -356,5 +356,28 @@ versamento aumenta valore e versato della stessa cifra, il rendimento non cambia
 
 **Database**: migration 0011 (1 colonna).
 
+
+## SPRINT 9 — COMPLETED (Report)
+
+**Implemented**
+- `/reports` (dalla Home, card "Report del mese"; resta evidenziata la Home):
+  settimana (lunedì–domenica), mese, anno, con frecce per i periodi precedenti.
+- "In breve": osservazioni generate solo dai numeri (risparmio e quota delle
+  entrate, uscite/entrate in aumento o calo ≥ 10% rispetto al periodo
+  precedente, categoria cresciuta/scesa di più ≥ 20 €, voce più pesante,
+  spesa più grande, variazione del patrimonio, movimenti da sistemare).
+  Nessun confronto con periodi vuoti, nessun "in calo" su un periodo in corso.
+- Mese: confronto con il mese precedente e con lo stesso mese dell'anno prima.
+- Anno: grafico mese per mese, confronto con l'anno precedente (entrate,
+  uscite, risparmio, quota risparmiata, patrimonio a fine anno), storico del
+  patrimonio a fine anno.
+- Spese per categoria e "Personale e business" in ogni report.
+
+**Acceptance**: insight solo da dati — test unitari (ogni frase riporta i
+numeri da cui nasce, periodo vuoto = una sola frase senza numeri) e di
+integrazione (stessi numeri della Home; somma dei mesi = totale dell'anno).
+
+**Database**: nessuna migration (aggregati SQL esistenti).
+
 **Da ricordare all'utente**: backup automatico del database locale (rimandato
 su richiesta).

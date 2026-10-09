@@ -16,7 +16,18 @@ const toDate = (iso: string) => new Date(`${iso}T00:00:00Z`)
  * daltonismo, token --chart-income / --chart-expense), un solo asse, legenda,
  * dettaglio del mese al passaggio o al tocco e tabella dei dati.
  */
-export function BusinessMonthlyChart({ months, currency, label }: { months: BusinessMonth[]; currency: string; label: string }) {
+export function BusinessMonthlyChart({
+  months,
+  currency,
+  label,
+  series = ['Incassi', 'Spese'],
+}: {
+  months: BusinessMonth[]
+  currency: string
+  label: string
+  /** Nomi delle due serie (es. Entrate/Uscite nei report). */
+  series?: [string, string]
+}) {
   const lastWithData = months.reduce((found, m, i) => (m.count > 0 ? i : found), months.length - 1)
   const [active, setActive] = useState(lastWithData)
   const max = Math.max(1, ...months.flatMap((m) => [m.revenue, m.expenses]))
@@ -35,10 +46,10 @@ export function BusinessMonthlyChart({ months, currency, label }: { months: Busi
       <div className="flex flex-wrap items-center justify-between gap-2">
         <ul className="flex gap-4 text-[13px] text-fg-muted" aria-label="Legenda">
           <li className="flex items-center gap-1.5">
-            <span aria-hidden className="size-2.5 rounded-sm bg-chart-income" /> Incassi
+            <span aria-hidden className="size-2.5 rounded-sm bg-chart-income" /> {series[0]}
           </li>
           <li className="flex items-center gap-1.5">
-            <span aria-hidden className="size-2.5 rounded-sm bg-chart-expense" /> Spese
+            <span aria-hidden className="size-2.5 rounded-sm bg-chart-expense" /> {series[1]}
           </li>
         </ul>
         {current ? (
@@ -90,9 +101,9 @@ export function BusinessMonthlyChart({ months, currency, label }: { months: Busi
           <thead className="text-fg-muted">
             <tr>
               <th className="py-1 font-medium">Mese</th>
-              <th className="py-1 text-right font-medium">Incassi</th>
-              <th className="py-1 text-right font-medium">Spese</th>
-              <th className="py-1 text-right font-medium">Utile</th>
+              <th className="py-1 text-right font-medium">{series[0]}</th>
+              <th className="py-1 text-right font-medium">{series[1]}</th>
+              <th className="py-1 text-right font-medium">Differenza</th>
             </tr>
           </thead>
           <tbody>

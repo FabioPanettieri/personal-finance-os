@@ -1,4 +1,4 @@
-import { FileUp } from 'lucide-react'
+import { ChevronRight, FileText, FileUp } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
@@ -90,8 +90,22 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         />
       </div>
 
-      <div className="mb-6 lg:mb-8">
+      <div className="mb-6 flex flex-col gap-3 lg:mb-8">
         <ReviewBanner transactions={d.review.transactions} importRows={d.review.importRows} />
+        <Link
+          href="/reports"
+          data-testid="report-link"
+          className="flex min-h-[64px] items-center gap-4 rounded-[var(--radius-card)] border border-line bg-surface px-5 py-3 transition-colors hover:bg-surface-2"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">
+            <FileText aria-hidden className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold text-fg">Report del mese</span>
+            <span className="block text-[13px] text-fg-muted">Settimana, mese e anno in poche righe, con il confronto</span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-fg-subtle" />
+        </Link>
       </div>
 
       <section aria-labelledby="accounts-title" className="mb-6 lg:mb-8">

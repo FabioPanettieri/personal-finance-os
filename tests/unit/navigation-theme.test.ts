@@ -51,4 +51,8 @@ describe('investimenti', () => {
   it('la pagina Investimenti tiene evidenziata la voce Conti', () => {
     expect(activePrimaryHref('/investments')).toBe('/accounts')
   })
+
+  it('i report tengono evidenziata la Home', () => {
+    expect(activePrimaryHref('/reports')).toBe('/')
+  })
 })
