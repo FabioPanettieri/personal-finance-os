@@ -113,6 +113,6 @@ describe('isolamento', () => {
     const rulesB = await listRules(b.client)
     expect(rulesB.find((r) => r.origin === 'learned' || r.pattern === 'zorblax lupo')).toBeUndefined()
     expect(await ruleSuggestions(b.client)).toEqual([])
-    expect(await applyRulesToPending(b.client)).toEqual({ applied: 0, proposed: 0, untouched: 0 })
+    expect(await applyRulesToPending(b.client)).toEqual({ applied: 0, proposed: 0, untouched: 0, linked: 0 })
   })
 })

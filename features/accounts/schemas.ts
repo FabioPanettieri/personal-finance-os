@@ -45,6 +45,20 @@ export const accountUpdateSchema = z.object({
     }
     return parsed.value
   }),
+  // Plafond mensile della carta: vuoto = nessuno.
+  creditLimit: z
+    .string()
+    .optional()
+    .transform((value, ctx): Cents | null | undefined => {
+      if (value === undefined) return undefined
+      if (value.trim() === '') return null
+      const parsed = parseAmountInput(value)
+      if (!parsed.ok || parsed.value <= 0) {
+        ctx.addIssue({ code: 'custom', message: parsed.ok ? 'Il plafond deve essere maggiore di zero' : parsed.error })
+        return z.NEVER
+      }
+      return parsed.value
+    }),
   initialBalanceOn: z
     .string()
     .transform((value) => (value === '' ? null : value))

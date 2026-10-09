@@ -6,7 +6,8 @@ import { SectionTitle } from '@/components/finance/section-title'
 import { Money } from '@/components/ui/money'
 import { BusinessMonthlyChart } from '@/features/business/components/monthly-chart'
 import { SplitOverview } from '@/features/business/components/split-overview'
-import { SpendingList } from '@/features/dashboard/components/home'
+import { SpendingList, spendingColor } from '@/features/dashboard/components/home'
+import { CategoryDonut, InsightList, KPI_ICONS, ReportHero, ReportKpi } from '@/features/reports/components/report-visuals'
 import type { Flows } from '@/lib/dashboard/metrics'
 import { DEFAULT_TIME_ZONE, today } from '@/lib/dates'
 import { formatPercent, type Cents } from '@/lib/money'
@@ -19,22 +20,7 @@ import { createSupabaseServerClient } from '@/server/supabase/server'
 
 export const metadata: Metadata = { title: 'Report' }
 
-const TONE_DOT = { positive: 'bg-positive', negative: 'bg-negative', warning: 'bg-warning', neutral: 'bg-fg-muted' } as const
 const rate = (f: Flows) => (f.income > 0 ? (f.income - f.expenses) / f.income : null)
-
-function Kpi({ label, value, previous, previousLabel, testId, tone }: { label: string; value: number; previous: number | null; previousLabel: string; testId: string; tone?: string }) {
-  return (
-    <div data-testid={testId} className="rounded-[18px] bg-surface-2 p-4">
-      <p className="text-[13px] text-fg-muted">{label}</p>
-      <Money value={value as Cents} currency="EUR" className={cn('mt-0.5 block text-[22px] font-bold', tone ?? 'text-fg')} />
-      {previous !== null ? (
-        <p className="mt-1 text-[12px] text-fg-subtle">
-          {previousLabel}: <Money value={previous as Cents} currency="EUR" />
-        </p>
-      ) : null}
-    </div>
-  )
-}
 
 /**
  * Report: settimana, mese, anno. Osservazioni solo dai dati, confronto con il
@@ -55,6 +41,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const range = { from: period.from, to: period.to }
   const saved = flows.income - flows.expenses
   const savedRate = rate(flows)
+  const hasPrev = prev.incomeCount + prev.expenseCount > 0
+  const spending = r.categories
+    .filter((c) => c.amount > 0)
+    .slice(0, 8)
+    .map((c) => ({ key: c.categoryId ?? 'none', label: c.label, amount: c.amount, share: c.share, color: c.color, count: c.count, href: transactionsHref({ ...range, type: 'spending', categoryId: c.categoryId ?? 'none' }) }))
+  const spendingTotal = spending.reduce((t, c) => t + c.amount, 0)
 
   return (
     <>
@@ -94,27 +86,38 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         )}
       </div>
 
+      <ReportHero label={period.label} saved={saved} rate={savedRate} currency={currency} />
+
+      <div className="mb-6 grid gap-3 sm:grid-cols-2">
+        <ReportKpi
+          label="Entrate"
+          value={flows.income}
+          previous={hasPrev ? prev.income : null}
+          previousLabel={period.previous.label}
+          href={transactionsHref({ ...range, type: 'income' })}
+          testId="report-income"
+          color="var(--positive)"
+          icon={KPI_ICONS.income}
+          currency={currency}
+        />
+        <ReportKpi
+          label="Uscite"
+          value={flows.expenses}
+          previous={hasPrev ? prev.expenses : null}
+          previousLabel={period.previous.label}
+          href={transactionsHref({ ...range, type: 'spending' })}
+          testId="report-expenses"
+          color="var(--chart-expense)"
+          icon={KPI_ICONS.expenses}
+          inverse
+          currency={currency}
+        />
+      </div>
+
       <section aria-labelledby="insights-title" className="mb-6 rounded-[var(--radius-card)] border border-line bg-surface p-5 lg:p-6">
         <SectionTitle id="insights-title">In breve</SectionTitle>
-        <ul aria-label="Osservazioni" className="flex flex-col gap-3">
-          {r.insights.map((i) => (
-            <li key={i.key} data-testid={`insight-${i.key}`} className="flex gap-3 text-[15px] leading-snug text-fg">
-              <span aria-hidden className={cn('mt-2 size-2 shrink-0 rounded-full', TONE_DOT[i.tone])} />
-              {i.text}
-            </li>
-          ))}
-        </ul>
+        <InsightList insights={r.insights} />
       </section>
-
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <Kpi label="Entrate" value={flows.income} previous={prev.incomeCount + prev.expenseCount > 0 ? prev.income : null} previousLabel={period.previous.label} testId="report-income" tone="text-positive" />
-        <Kpi label="Uscite" value={flows.expenses} previous={prev.incomeCount + prev.expenseCount > 0 ? prev.expenses : null} previousLabel={period.previous.label} testId="report-expenses" />
-        <div data-testid="report-saved" className="rounded-[18px] bg-surface-2 p-4">
-          <p className="text-[13px] text-fg-muted">{saved >= 0 ? 'Messo da parte' : 'Speso in più'}</p>
-          <Money value={Math.abs(saved) as Cents} currency={currency} className={cn('mt-0.5 block text-[22px] font-bold', saved >= 0 ? 'text-fg' : 'text-negative')} />
-          {savedRate !== null ? <p className="mt-1 text-[12px] text-fg-subtle">{formatPercent(savedRate)} delle entrate</p> : null}
-        </div>
-      </div>
 
       {r.lastYearFlows && period.lastYear && r.lastYearFlows.incomeCount + r.lastYearFlows.expenseCount > 0 ? (
         <p className="-mt-3 mb-6 text-[13px] text-fg-muted" data-testid="report-last-year">
@@ -140,13 +143,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <SectionTitle id="cats-title" href={transactionsHref({ ...range, type: 'spending' })} linkLabel="Movimenti">
             Dove sono andati i soldi
           </SectionTitle>
-          <SpendingList
-            currency={currency}
-            items={r.categories
-              .filter((c) => c.amount > 0)
-              .slice(0, 8)
-              .map((c) => ({ key: c.categoryId ?? 'none', label: c.label, amount: c.amount, share: c.share, href: transactionsHref({ ...range, type: 'spending', categoryId: c.categoryId ?? 'none' }) }))}
-          />
+          {spending.length > 0 ? (
+            <CategoryDonut items={spending.map((c, i) => ({ key: c.key, label: c.label, amount: c.amount, color: spendingColor(c, i) }))} total={spendingTotal} currency={currency} />
+          ) : null}
+          <SpendingList currency={currency} items={spending} />
         </section>
         <SplitOverview split={r.split} currency={currency} />
       </div>

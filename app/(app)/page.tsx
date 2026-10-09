@@ -202,6 +202,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 label: c.label,
                 amount: c.amount,
                 share: c.share,
+                color: c.color,
+                count: c.count,
                 href: transactionsHref({ ...range, type: 'spending', categoryId: c.categoryId ?? 'none' }),
               }))}
           />

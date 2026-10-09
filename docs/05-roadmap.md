@@ -470,3 +470,39 @@ integrazione 117, backup reale 1 (anche in CI), E2E locali 48 + 4 saltati
 per scelta, E2E con mock 24.
 
 **Database**: nessuna migration.
+
+
+## DOPO LO SPRINT 12 — Richieste sull'uso reale
+
+**Implemented**
+- **Giroconti riconosciuti da soli** (`lib/transfers/own-transfers.ts`,
+  `server/repositories/own-transfers.ts`): regole imparate, visibili in /rules.
+  1. Bonifici da/verso una persona con il nome dell'intestatario (dai giroconti
+     dichiarati dalla banca o dal nome del profilo), in qualunque ordine e con
+     "Paypal*": giroconto al 95%.
+  2. Almeno 3 bonifici in uscita verso lo stesso IBAN, mai corretti a mano come
+     spesa o entrata: giroconto al 90%.
+  Si applicano a ogni import e con "Applica ai movimenti da sistemare", che ora
+  collega anche le due metà del giroconto quando ce n'è una sola possibile.
+- **Carta di credito senza dettaglio** (migration 0012): ogni addebito mensile
+  sulla carta diventa anche una spesa "Carta di credito" sulla carta stessa
+  (trigger, con pulizia se l'addebito sparisce); saldo carta a zero, spesa
+  visibile in "Dove sono andati i soldi". Plafond mensile (`credit_limit_cents`)
+  nelle impostazioni della carta, con barra dell'utilizzo.
+- **Trade Republic come appoggio per il PAC**: spiegato nella pagina del conto;
+  i versamenti restano "investimento", gli acquisti del PAC in Investimenti.
+- **Dettaglio conto**: Entrate, Uscite, Trasferimenti, Transazioni in card
+  colorate e cliccabili (aprono i movimenti filtrati) con l'andamento degli
+  ultimi 6 mesi.
+- **Business** e **Report** ridisegnati: testata colorata con il conto
+  "incassi − spese = utile" e la quota risparmiata, card nel colore di ogni
+  attività con "su 100 € incassati te ne restano N", variazioni con freccia e
+  percentuale, osservazioni con icone, ciambella delle spese per categoria,
+  elenchi spese colorati con quota e numero di movimenti.
+- `npm run decisioni -- file.json`: trasforma le decisioni dell'utente
+  (testo → tipo/categoria/business/fonte, plafond) in regole sul database
+  locale. Il file resta fuori dal repository.
+
+**Tests**: SQL 177, unit 339, integrazione 121, E2E locali 48 + 4 saltati,
+E2E con mock 24, backup reale 1. axe senza violazioni anche sul dettaglio
+conto e business.

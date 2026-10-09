@@ -113,16 +113,17 @@ describe('ING formato reale: anteprima → conferma', () => {
   it('conferma: contropartite su Conto Risparmio e Carta di credito, nessuna su Revolut', async () => {
     const result = await commitImport(a.client, importId)
     expect(result).toMatchObject({ ok: true, value: { imported: 12, transactions: 16 } })
-    expect(await balances()).toMatchObject({ 'ING Direct': 40000, 'ING Conto Risparmio': 0, 'Carta di credito': 40000, Revolut: 0 })
+    // Carta senza estratto dettagliato (0012): l'addebito arriva come giroconto ed esce come spesa "Carta di credito".
+    expect(await balances()).toMatchObject({ 'ING Direct': 40000, 'ING Conto Risparmio': 0, 'Carta di credito': 0, Revolut: 0 })
 
-    const { data: cardTx } = await admin.from('transactions').select('id, type, amount_cents').eq('account_id', card)
-    expect(cardTx).toMatchObject([{ type: 'transfer', amount_cents: 40000 }])
-    expect((await groupOf(cardTx![0]!.id)).map((l) => [l.account_id, l.amount_cents]).sort()).toEqual(
+    const { data: cardTx } = await admin.from('transactions').select('id, type, amount_cents').eq('account_id', card).order('amount_cents')
+    expect(cardTx).toMatchObject([{ type: 'expense', amount_cents: -40000 }, { type: 'transfer', amount_cents: 40000 }])
+    expect((await groupOf(cardTx![1]!.id)).map((l) => [l.account_id, l.amount_cents]).sort()).toEqual(
       [[card, 40000], [ing, -40000]].sort(),
     )
     const { count } = await admin.from('transactions').select('id', { count: 'exact', head: true }).eq('account_id', savings).not('transfer_group_id', 'is', null)
     expect(count).toBe(3)
-    // Nessuna spesa fittizia: l'addebito carta non è un'uscita.
+    // Sul conto corrente l'addebito carta resta un giroconto: la spesa è sulla carta, contata una volta sola.
     const { data: expenses } = await admin.from('transactions').select('amount_cents').eq('account_id', ing).eq('type', 'expense')
     expect(expenses!.map((e) => e.amount_cents)).toEqual([-30000])
   })

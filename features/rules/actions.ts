@@ -92,7 +92,7 @@ export async function applyRulesAction(): Promise<RuleFormState> {
   if (r.applied + r.proposed === 0) return { status: 'done', message: 'Nessuna regola corrisponde ai movimenti da sistemare.' }
   return {
     status: 'done',
-    message: `${r.applied} classificati${r.proposed > 0 ? `, ${r.proposed} con una proposta da confermare (regole che non si applicano da sole)` : ''}.`,
+    message: `${r.applied} classificati${r.proposed > 0 ? `, ${r.proposed} con una proposta da confermare (regole che non si applicano da sole)` : ''}${r.linked > 0 ? `, ${r.linked} giroconti collegati all’altra metà` : ''}.`,
   }
 }
 

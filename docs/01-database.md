@@ -100,6 +100,10 @@ erDiagram
   (`business_id` presente ⇔ `nature = business`, trigger `sync_transaction_nature`).
 - Dalla 0011 `investment_valuations.unit_price`: prezzo unitario inserito a mano;
   il valore di uno strumento è quantità attuale × ultimo prezzo.
+- Dalla 0012 `accounts.credit_limit_cents` (plafond mensile della carta, > 0) e
+  trigger `add_card_spending` / `remove_card_spending`: sulla carta senza banca
+  d'importazione ogni metà speculare di un addebito genera la spesa "Carta di
+  credito" (impronta `card_spending_fingerprint`), tolta se l'addebito sparisce.
 
 ### Import
 - **import_profiles** — mapping per banca (encoding, delimitatore, formato data,

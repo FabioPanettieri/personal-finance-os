@@ -135,6 +135,10 @@ test('ING formato reale: NUL in coda, saldi informativi, trasferimenti verso con
   await expect(summary).toContainText('Importate12')
 
   const { data: card } = await admin.from('accounts').select('id').eq('user_id', user.id).eq('name', 'Carta di credito').single()
-  const { data: cardTx } = await admin.from('transactions').select('amount_cents, type').eq('account_id', card!.id)
-  expect(cardTx).toEqual([{ amount_cents: 40000, type: 'transfer' }])
+  const { data: cardTx } = await admin.from('transactions').select('amount_cents, type').eq('account_id', card!.id).order('amount_cents')
+  // L'addebito arriva sulla carta come giroconto ed esce come spesa "Carta di credito" (0012).
+  expect(cardTx).toEqual([
+    { amount_cents: -40000, type: 'expense' },
+    { amount_cents: 40000, type: 'transfer' },
+  ])
 })

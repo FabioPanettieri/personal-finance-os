@@ -1,11 +1,14 @@
 import { AUTO_APPLY_CONFIDENCE, classify, type ClassifyInput } from '@/lib/categorization/engine'
 import { applyDecision, suggestRules, type ManualRow, type RuleSuggestion } from '@/lib/categorization/learn'
 import type { Rule } from '@/lib/categorization/rules'
+import { ingCounterparty } from '@/lib/imports/importers/ing'
 import type { ImportSource } from '@/lib/imports/types'
 import { findChoice } from '@/lib/transactions/quick-choices'
 
 import { RepositoryError, type DbClient } from './accounts'
 import { loadClassificationData } from './import-context'
+import { learnOwnTransferRules } from './own-transfers'
+import { linkTransfer, transferCandidates } from './transfers'
 import { resolveChoice } from './transactions'
 
 /**
@@ -179,6 +182,7 @@ type TxRow = {
   category_id: string | null
   business_id: string | null
   income_source_id: string | null
+  original_description: string
   accounts: { default_bank_profile: string | null }
 }
 
@@ -189,6 +193,8 @@ function inputFor(t: TxRow): ClassifyInput {
     source: (profile ?? 'generic') as ImportSource,
     description: t.description,
     counterparty: t.counterparty,
+    // L'IBAN della controparte non è una colonna: per ING è nella descrizione originale.
+    counterpartyIban: profile === 'ing' ? ingCounterparty(t.original_description).iban : null,
     amount: Number(t.amount_cents),
     hint: null,
     movement: 'cash',
@@ -196,7 +202,7 @@ function inputFor(t: TxRow): ClassifyInput {
   } as ClassifyInput
 }
 
-const TX_COLUMNS = 'id, description, counterparty, amount_cents, account_id, type, nature, category_id, business_id, income_source_id, accounts!inner(default_bank_profile)'
+const TX_COLUMNS = 'id, description, counterparty, amount_cents, account_id, type, nature, category_id, business_id, income_source_id, original_description, accounts!inner(default_bank_profile)'
 
 /** Suggerimenti dalle correzioni a mano non ancora coperte da una regola attiva. */
 export async function ruleSuggestions(db: DbClient): Promise<RuleSuggestion[]> {
@@ -218,7 +224,7 @@ export async function ruleSuggestions(db: DbClient): Promise<RuleSuggestion[]> {
   return suggestRules(manual, () => false)
 }
 
-export type ApplyReport = { applied: number; proposed: number; untouched: number }
+export type ApplyReport = { applied: number; proposed: number; untouched: number; linked: number }
 
 /**
  * Riapplica le regole attive ai movimenti da sistemare (non collegati a un
@@ -227,12 +233,14 @@ export type ApplyReport = { applied: number; proposed: number; untouched: number
  * automatica sotto soglia.
  */
 export async function applyRulesToPending(db: DbClient): Promise<ApplyReport> {
+  // Prima impara i giroconti (nome dell'intestatario, IBAN ricorrenti), poi applica.
+  await learnOwnTransferRules(db)
   const [{ data, error }, classification] = await Promise.all([
     db.from('transactions').select(TX_COLUMNS).eq('is_categorized', false).is('transfer_group_id', null).limit(SCAN_LIMIT),
     loadClassificationData(db),
   ])
   if (error) fail('Movimenti da sistemare', error)
-  const report: ApplyReport = { applied: 0, proposed: 0, untouched: 0 }
+  const report: ApplyReport = { applied: 0, proposed: 0, untouched: 0, linked: 0 }
   const hits = new Map<string, number>()
   for (const t of data as unknown as TxRow[]) {
     const c = classify(inputFor(t), classification.rules, classification.lookups)
@@ -258,6 +266,12 @@ export async function applyRulesToPending(db: DbClient): Promise<ApplyReport> {
       .eq('is_categorized', false)
     if (e) fail('Applicazione regola', e)
     report[decision === 'apply' ? 'applied' : 'proposed'] += 1
+    // Giroconto confermato: collega l'altra metà se ce n'è una sola possibile.
+    if (decision === 'apply' && (c.type === 'transfer' || c.type === 'investment')) {
+      const candidates = await transferCandidates(db, t.id)
+      const internal = candidates.filter((x) => x.type === 'transfer' || x.type === 'investment')
+      if (candidates.length === 1 && internal.length === 1 && (await linkTransfer(db, t.id, internal[0]!.id)).ok) report.linked += 1
+    }
     hits.set(c.ruleDbId, (hits.get(c.ruleDbId) ?? 0) + 1)
   }
   for (const [ruleId, n] of hits) {

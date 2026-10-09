@@ -1,7 +1,6 @@
-import { ArrowDownLeft, ArrowLeft, ArrowLeftRight, ArrowUpRight, LineChart, ListOrdered } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, LineChart, ListOrdered } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import type { ReactNode } from 'react'
 import { notFound } from 'next/navigation'
 
 import { Card, CardHeader } from '@/components/ui/card'
@@ -10,28 +9,70 @@ import { Money } from '@/components/ui/money'
 import { AccountActiveToggle } from '@/features/accounts/components/account-active-toggle'
 import { AccountEditForm } from '@/features/accounts/components/account-edit-form'
 import { BalanceChart } from '@/features/accounts/components/balance-chart'
+import { AccountFlowTiles } from '@/features/accounts/components/flow-tiles'
 import { accountIdSchema } from '@/features/accounts/schemas'
 import { accountColor, bankForAccount, bankGradient } from '@/lib/banks'
-import { balanceSeries, movementsInBalanceWindow, summarizeFlows } from '@/lib/accounts'
-import { formatIsoDate } from '@/lib/dates'
+import { balanceSeries, monthlyAccountFlows, movementsInBalanceWindow, summarizeFlows, type MonthlyAccountFlow } from '@/lib/accounts'
+import { DEFAULT_TIME_ZONE, formatIsoDate, today } from '@/lib/dates'
+import type { Cents } from '@/lib/money'
+import { transactionsHref } from '@/lib/transactions/filters'
 import { formatAmountInput } from '@/lib/money/parse'
 import { requireUser } from '@/server/auth/session'
-import { getAccount, listAccountMovements } from '@/server/repositories/accounts'
+import { getAccount, listAccountMovements, type Account } from '@/server/repositories/accounts'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 
 type Params = { params: Promise<{ id: string }> }
 
 export const metadata: Metadata = { title: 'Dettaglio conto' }
 
-function Stat({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+/** Carta di credito: plafond mensile e quanto ne hai usato con l'ultimo addebito. */
+function CardLimit({ account, monthly }: { account: Account; monthly: MonthlyAccountFlow[] }) {
+  const last = [...monthly].reverse().find((m) => m.spending > 0)
+  const limit = account.creditLimit
+  const share = limit && last ? Math.min(1, last.spending / limit) : 0
   return (
-    <Card className="flex flex-col gap-1.5 p-4 lg:p-5">
-      <span className="text-[12px] font-medium tracking-wide text-fg-muted uppercase">{label}</span>
-      <span className="text-lg font-semibold text-fg lg:text-xl">{children}</span>
-      {hint ? <span className="text-xs text-fg-subtle">{hint}</span> : null}
+    <Card className="mb-4 lg:mb-6" data-testid="card-limit">
+      <CardHeader
+        title="Plafond della carta"
+        description="Il dettaglio degli acquisti non c’è: ogni addebito mensile sul conto conta come spesa “Carta di credito”."
+      />
+      {limit ? (
+        <>
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <p className="text-sm text-fg-muted">
+              {last ? (
+                <>
+                  Ultimo addebito{' '}
+                  <span className="font-semibold text-fg capitalize">{MONTH_LONG.format(new Date(`${last.month}T00:00:00Z`))}</span>:{' '}
+                  <Money value={last.spending} currency={account.currency} className="font-semibold text-fg" />
+                </>
+              ) : (
+                'Nessun addebito negli ultimi mesi.'
+              )}
+            </p>
+            <p className="text-sm text-fg-muted">
+              Plafond <Money value={limit} currency={account.currency} className="font-semibold text-fg" /> al mese
+            </p>
+          </div>
+          <div className="mt-3 h-3 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`Usato il ${Math.round(share * 100)}% del plafond`}>
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${share * 100}%`, background: share > 0.85 ? 'var(--negative)' : share > 0.6 ? 'var(--warning)' : 'var(--positive)' }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-fg-muted">
+            Usato il {Math.round(share * 100)}% · disponibili{' '}
+            <Money value={Math.max(0, limit - (last?.spending ?? 0)) as Cents} currency={account.currency} className="font-medium text-fg" />
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-fg-muted">Imposta il plafond mensile qui sotto, in “Impostazioni del conto”.</p>
+      )}
     </Card>
   )
 }
+
+const MONTH_LONG = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 export default async function AccountDetailPage({ params }: Params) {
   const { id } = await params
@@ -46,6 +87,8 @@ export default async function AccountDetailPage({ params }: Params) {
   const windowed = movementsInBalanceWindow(movements, account.initialBalanceOn)
   const flows = summarizeFlows(windowed)
   const series = balanceSeries(movements, account.initialBalance, account.initialBalanceOn)
+  const monthly = monthlyAccountFlows(windowed, today(DEFAULT_TIME_ZONE))
+  const isTradeRepublic = account.institution === 'Trade Republic'
   const isInvestment = account.type.kind === 'investment'
   const windowLabel = account.initialBalanceOn ? `Dal ${formatIsoDate(account.initialBalanceOn)}` : 'Tutti i movimenti'
 
@@ -80,32 +123,22 @@ export default async function AccountDetailPage({ params }: Params) {
         </div>
       </header>
 
-      <section aria-label="Riepilogo movimenti" className="mb-4 grid grid-cols-2 gap-3 lg:mb-6 lg:grid-cols-4 lg:gap-4">
-        <Stat label="Entrate" hint={windowLabel}>
-          <Money value={flows.income} currency={account.currency} />
-        </Stat>
-        <Stat label="Uscite" hint={flows.refunds > 0 ? 'Al netto dei rimborsi' : windowLabel}>
-          <Money value={flows.netExpenses} currency={account.currency} />
-        </Stat>
-        <Stat label="Trasferimenti" hint="Tra conti propri: non sono entrate né spese">
-          <span className="flex flex-col text-base lg:text-lg">
-            <span className="inline-flex items-center gap-1">
-              <ArrowDownLeft aria-label="In entrata" className="size-4 text-fg-subtle" />
-              <Money value={flows.transfersIn} currency={account.currency} />
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <ArrowUpRight aria-label="In uscita" className="size-4 text-fg-subtle" />
-              <Money value={flows.transfersOut} currency={account.currency} />
-            </span>
-          </span>
-        </Stat>
-        <Stat
-          label="Transazioni"
-          hint={account.lastTransactionOn ? `Ultima attività ${formatIsoDate(account.lastTransactionOn)}` : 'Nessuna attività'}
-        >
-          <span className="tabular">{account.transactionCount}</span>
-        </Stat>
-      </section>
+      <AccountFlowTiles
+        flows={flows}
+        monthly={monthly}
+        currency={account.currency}
+        windowLabel={windowLabel}
+        transactionCount={account.transactionCount}
+        lastActivity={account.lastTransactionOn ? `Ultima attività ${formatIsoDate(account.lastTransactionOn)}` : 'Nessuna attività'}
+        hrefs={{
+          income: transactionsHref({ accountId: account.id, type: 'income' }),
+          spending: transactionsHref({ accountId: account.id, type: 'spending' }),
+          transfers: transactionsHref({ accountId: account.id, type: 'transfer' }),
+          all: transactionsHref({ accountId: account.id }),
+        }}
+      />
+
+      {account.type.code === 'card' ? <CardLimit account={account} monthly={monthly} /> : null}
 
       {flows.investedOut > 0 || flows.investedIn > 0 ? (
         <Card className="mb-4 flex items-center gap-3 p-4 lg:mb-6">
@@ -125,8 +158,14 @@ export default async function AccountDetailPage({ params }: Params) {
 
       {isInvestment ? (
         <p className="mb-4 rounded-[var(--radius-control)] bg-accent-soft px-4 py-3 text-sm text-fg lg:mb-6">
-          Per i conti investimento il saldo riflette solo i movimenti di liquidità (versamenti e prelievi). Valore di
-          mercato e rendimento arriveranno con lo Sprint 8.
+          {isTradeRepublic
+            ? 'Conto d’appoggio per il PAC: i soldi che arrivano qui servono a comprare gli ETF del piano di accumulo. Non sono spese: i versamenti contano come investimento, gli acquisti del PAC compaiono in Investimenti. '
+            : null}
+          Il saldo qui è la liquidità del conto; valore dei titoli e rendimento sono in{' '}
+          <Link href="/investments" className="font-semibold underline">
+            Investimenti
+          </Link>
+          .
         </p>
       ) : null}
 
@@ -161,6 +200,7 @@ export default async function AccountDetailPage({ params }: Params) {
               initialBalanceOn: account.initialBalanceOn ?? '',
               iban: account.iban ?? '',
               currency: account.currency,
+              ...(account.type.code === 'card' ? { creditLimit: account.creditLimit ? formatAmountInput(account.creditLimit) : '' } : {}),
             }}
           />
         </Card>

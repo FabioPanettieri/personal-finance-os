@@ -28,7 +28,8 @@
     "test:e2e:local": "node scripts/with-local-supabase.mjs playwright test --config playwright.local.config.ts",
     "backup": "node scripts/backup/backup.mjs",
     "restore": "node scripts/backup/restore.mjs",
-    "test:backup": "node scripts/backup/selftest.mjs"
+    "test:backup": "node scripts/backup/selftest.mjs",
+    "decisioni": "node scripts/rules/apply-decisions.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

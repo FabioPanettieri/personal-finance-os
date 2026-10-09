@@ -246,6 +246,8 @@ export type BusinessPerformance = {
   /** profit / revenue; null se i ricavi sono zero (mai divisione per zero). */
   margin: number | null
   count: number
+  /** Colore dell'attività (identità), se impostato. */
+  color: string | null
 }
 
 export function businessMargin(revenue: number, profit: number): number | null {
@@ -255,7 +257,7 @@ export function businessMargin(revenue: number, profit: number): number | null {
 /** Una riga per ogni business attivo, anche senza movimenti nel periodo. */
 export function businessPerformance(
   rows: readonly BusinessRow[],
-  businesses: readonly { id: string; name: string }[],
+  businesses: readonly { id: string; name: string; color?: string | null }[],
   currency = BASE_CURRENCY,
 ): BusinessPerformance[] {
   return businesses.map((b) => {
@@ -271,6 +273,7 @@ export function businessPerformance(
       profit: cents(profit),
       margin: businessMargin(revenue, profit),
       count: mine.reduce((s, r) => s + r.count, 0),
+      color: b.color ?? null,
     }
   })
 }

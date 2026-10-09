@@ -18,6 +18,8 @@ export type AccountEditValues = {
   initialBalance: string;
   initialBalanceOn: string;
   currency: string;
+  /** Solo per le carte: plafond mensile (vuoto = nessuno). */
+  creditLimit?: string;
 };
 
 const INITIAL: AccountFormState = { status: "idle" };
@@ -45,6 +47,7 @@ export function AccountEditForm({
     color: values.color ?? "",
     initialBalance: values.initialBalance,
     initialBalanceOn: values.initialBalanceOn,
+    creditLimit: values.creditLimit,
   };
 
   return (
@@ -84,6 +87,17 @@ export function AccountEditForm({
           hint="Formato 1.234,56 — il saldo all’inizio della data indicata."
           error={errors?.initialBalance}
         />
+        {values.creditLimit !== undefined ? (
+          <Field
+            label={`Plafond mensile (${values.currency})`}
+            name="creditLimit"
+            defaultValue={current.creditLimit ?? ""}
+            inputMode="decimal"
+            autoComplete="off"
+            hint="Es. 2.000,00 — quanto puoi spendere con la carta ogni mese."
+            error={errors?.creditLimit}
+          />
+        ) : null}
         <Field
           label="Data del saldo iniziale"
           name="initialBalanceOn"

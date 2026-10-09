@@ -12,7 +12,7 @@ import { accountIdSchema, accountUpdateSchema } from './schemas'
 export type AccountFormState = FormState & {
   savedAt?: number
   /** Valori inviati, restituiti in caso d'errore: React 19 azzera il form dopo l'action. */
-  values?: Record<'name' | 'institution' | 'iban' | 'color' | 'initialBalance' | 'initialBalanceOn', string>
+  values?: Record<'name' | 'institution' | 'iban' | 'color' | 'initialBalance' | 'initialBalanceOn', string> & { creditLimit?: string }
 }
 
 function submittedValues(formData: FormData): NonNullable<AccountFormState['values']> {
@@ -27,6 +27,8 @@ function submittedValues(formData: FormData): NonNullable<AccountFormState['valu
     color: text('color'),
     initialBalance: text('initialBalance'),
     initialBalanceOn: text('initialBalanceOn'),
+    // Il campo esiste solo nel form delle carte: assente = non toccare il valore salvato.
+    ...(formData.has('creditLimit') ? { creditLimit: text('creditLimit') } : {}),
   }
 }
 

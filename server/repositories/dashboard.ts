@@ -100,8 +100,8 @@ export async function categoryTree(db: DbClient): Promise<CategoryNode[]> {
   return data.map((c) => ({ id: c.id, name: c.name, parentId: c.parent_id, color: c.color }))
 }
 
-export async function businessList(db: DbClient): Promise<{ id: string; name: string }[]> {
-  const { data, error } = await db.from('businesses').select('id, name').eq('is_active', true).order('sort_order')
+export async function businessList(db: DbClient): Promise<{ id: string; name: string; color: string | null }[]> {
+  const { data, error } = await db.from('businesses').select('id, name, color').eq('is_active', true).order('sort_order')
   if (error) fail('Business', error)
   return data
 }

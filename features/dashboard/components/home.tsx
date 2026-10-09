@@ -249,24 +249,45 @@ export function ReviewBanner({ transactions, importRows }: { transactions: numbe
   )
 }
 
-export type SpendingItem = { key: string; label: string; amount: Cents; share: number; href: string }
+export type SpendingItem = { key: string; label: string; amount: Cents; share: number; href: string; color?: string | null; count?: number }
+
+/** Colori di riserva quando la categoria non ne ha uno (stessa famiglia dei token del design system). */
+const FALLBACK_COLORS = ['#7C86F0', '#E8853B', '#30A46C', '#D6409F', '#0090FF', '#8E4EC6', '#12A594', '#E5484D']
+
+/** Colore di una voce di spesa: quello della categoria, altrimenti uno della tavolozza (grigio per "senza categoria"). */
+export function spendingColor(item: Pick<SpendingItem, 'key' | 'color'>, index: number): string {
+  return item.color ?? (item.key === 'none' ? 'var(--fg-subtle)' : FALLBACK_COLORS[index % FALLBACK_COLORS.length]!)
+}
 
 export function SpendingList({ items, currency }: { items: SpendingItem[]; currency: string }) {
   if (items.length === 0) return <p className="py-6 text-center text-sm text-fg-muted">Nessuna spesa in questo periodo.</p>
   const max = Math.max(...items.map((i) => i.amount))
   return (
     <ul aria-label="Spese per categoria" className="flex flex-col gap-1">
-      {items.map((item) => (
-        <li key={item.key}>
-          <Link href={item.href} className="-mx-2 flex flex-col gap-2 rounded-[14px] px-2 py-2.5 transition-colors hover:bg-surface-2">
-            <span className="flex items-baseline justify-between gap-3">
-              <span className="truncate text-[15px] font-medium text-fg">{item.label}</span>
-              <Money value={item.amount} currency={currency} className="shrink-0 text-[15px] font-semibold text-fg" />
-            </span>
-            <Bar value={item.amount} max={max} color="var(--fg-muted)" />
-          </Link>
-        </li>
-      ))}
+      {items.map((item, index) => {
+        const color = spendingColor(item, index)
+        return (
+          <li key={item.key}>
+            <Link href={item.href} className="group -mx-2 flex items-center gap-3 rounded-[14px] px-2 py-2.5 transition-colors hover:bg-surface-2">
+              <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white" style={{ background: color }}>
+                {item.label.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="truncate text-[15px] font-medium text-fg">{item.label}</span>
+                  <Money value={item.amount} currency={currency} className="shrink-0 text-[15px] font-semibold text-fg" />
+                </span>
+                <Bar value={item.amount} max={max} color={color} />
+                <span className="flex justify-between text-[12px] text-fg-muted">
+                  <span>{Math.round(item.share * 100)}% del totale</span>
+                  {item.count !== undefined ? <span>{item.count === 1 ? '1 movimento' : `${item.count} movimenti`}</span> : null}
+                </span>
+              </span>
+              <ChevronRight aria-hidden className="size-4 shrink-0 text-fg-subtle transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </li>
+        )
+      })}
     </ul>
   )
 }

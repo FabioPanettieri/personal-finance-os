@@ -172,3 +172,40 @@ export function totalsByCurrency(
     a.currency === 'EUR' ? -1 : b.currency === 'EUR' ? 1 : a.currency.localeCompare(b.currency),
   )
 }
+
+export type MonthlyAccountFlow = {
+  /** Primo giorno del mese (YYYY-MM-01). */
+  month: IsoDate
+  income: Cents
+  /** Spese al netto dei rimborsi (mai negative). */
+  spending: Cents
+  /** Trasferimenti e versamenti, entrata + uscita in valore assoluto. */
+  transfers: Cents
+  count: number
+}
+
+/** Ultimi `months` mesi fino a quello di `today` incluso: andamento mese per mese di un conto. */
+export function monthlyAccountFlows(movements: readonly AccountMovement[], today: IsoDate, months = 6): MonthlyAccountFlow[] {
+  const [y, m] = today.split('-').map(Number) as [number, number]
+  const keys: IsoDate[] = []
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(y, m - 1 - i, 1))
+    keys.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01` as IsoDate)
+  }
+  const byMonth = new Map(keys.map((k) => [k.slice(0, 7), { month: k, income: 0, spending: 0, transfers: 0, count: 0 }]))
+  for (const mv of movements) {
+    const entry = byMonth.get(mv.bookedOn.slice(0, 7))
+    if (!entry) continue
+    entry.count += 1
+    if (mv.type === 'income') entry.income += mv.amount
+    else if (mv.type === 'expense' || mv.type === 'refund') entry.spending += -mv.amount
+    else entry.transfers += Math.abs(mv.amount)
+  }
+  return [...byMonth.values()].map((e) => ({
+    month: e.month,
+    income: e.income as Cents,
+    spending: Math.max(0, e.spending) as Cents,
+    transfers: e.transfers as Cents,
+    count: e.count,
+  }))
+}

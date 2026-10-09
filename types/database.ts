@@ -34,6 +34,7 @@ export type Database = {
           account_type: string
           color: string | null
           created_at: string
+          credit_limit_cents: number | null
           currency: string
           default_bank_profile: Database['public']['Enums']['bank_profile'] | null
           iban: string | null
@@ -52,6 +53,7 @@ export type Database = {
           account_type: string
           color?: string | null
           created_at?: string
+          credit_limit_cents?: number | null
           currency?: string
           default_bank_profile?: Database['public']['Enums']['bank_profile'] | null
           iban?: string | null
@@ -70,6 +72,7 @@ export type Database = {
           account_type?: string
           color?: string | null
           created_at?: string
+          credit_limit_cents?: number | null
           currency?: string
           default_bank_profile?: Database['public']['Enums']['bank_profile'] | null
           iban?: string | null
@@ -1616,6 +1619,8 @@ export type Database = {
           tx_count: number
         }[]
       }
+      card_spending_category: { Args: { p_user: string }; Returns: string }
+      card_spending_fingerprint: { Args: { p_fingerprint: string }; Returns: string }
       category_id_by_path: { Args: { p_path: string; p_user_id: string }; Returns: string }
       dashboard_account_changes: {
         Args: { p_from: string; p_to: string }

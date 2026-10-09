@@ -126,6 +126,8 @@ export default async function BusinessDetailPage({
               label: c.label,
               amount: c.amount,
               share: c.share,
+              color: c.color,
+              count: c.count,
               href: transactionsHref({ ...range, businessId: id, type: 'spending', categoryId: c.categoryId ?? 'none' }),
             }))}
           />

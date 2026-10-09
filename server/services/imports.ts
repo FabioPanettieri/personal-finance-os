@@ -1,6 +1,7 @@
 import { addDays, DEFAULT_TIME_ZONE, isIsoDate, type IsoDate } from '@/lib/dates'
 import { AUTO_APPLY_CONFIDENCE, deriveNature, REVIEW_BELOW_CONFIDENCE, signAllows } from '@/lib/categorization/engine'
 import { mirrorFingerprint, secondaryFingerprint } from '@/lib/imports/fingerprint'
+import { applyRulesToPending } from '@/server/repositories/rules'
 import { positiveDecimal } from '@/lib/csv/values'
 import { IMPORTERS } from '@/lib/imports/importers'
 import {
@@ -590,6 +591,14 @@ export async function commitImport(db: DbClient, importId: string, timeZone = DE
     .eq('id', importId)
     .eq('status', 'preview')
   if (finalError) fail('Chiusura importazione', finalError)
+
+  // Giroconti imparati (nome dell'intestatario, IBAN ricorrenti) e regole sui movimenti
+  // ancora da sistemare, anche di import precedenti. Un errore qui non annulla l'import.
+  try {
+    await applyRulesToPending(db)
+  } catch (e) {
+    console.error('[imports] riapplicazione regole non riuscita', { message: e instanceof Error ? e.message : 'errore' })
+  }
 
   return {
     ok: true,

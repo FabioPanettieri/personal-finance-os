@@ -58,6 +58,14 @@ test('accessibilità: tutte le pagine, tema scuro e chiaro', async ({ page, isMo
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
       await audit(page, `${path} (${theme})`)
     }
+    // Dettaglio di un conto e di un business (card colorate e cliccabili).
+    await page.goto('/accounts')
+    await page.getByRole('list', { name: 'Conti attivi' }).getByRole('link').first().click()
+    await expect(page.getByTestId('tile-income')).toBeVisible()
+    await audit(page, `dettaglio conto (${theme})`)
+    await page.goto('/business')
+    await page.getByTestId('business-VOXEL Studio').getByRole('link', { name: /VOXEL Studio/ }).click()
+    await audit(page, `dettaglio business (${theme})`)
   }
 })
 

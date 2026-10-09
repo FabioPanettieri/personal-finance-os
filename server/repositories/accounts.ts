@@ -47,16 +47,19 @@ export type Account = {
   balance: Cents
   transactionCount: number
   lastTransactionOn: IsoDate | null
+  /** Plafond mensile (solo carte di credito), facoltativo. */
+  creditLimit: Cents | null
 }
 
 const ACCOUNT_COLUMNS =
-  'id, name, institution, iban, currency, color, is_active, sort_order, initial_balance_cents, initial_balance_on, account_types!inner(code, label, is_liquid, is_investment)'
+  'id, name, institution, iban, credit_limit_cents, currency, color, is_active, sort_order, initial_balance_cents, initial_balance_on, account_types!inner(code, label, is_liquid, is_investment)'
 
 type AccountRow = {
   id: string
   name: string
   institution: string | null
   iban: string | null
+  credit_limit_cents: number | null
   currency: string
   color: string | null
   is_active: boolean
@@ -89,6 +92,7 @@ function toAccount(row: AccountRow, balance: BalanceRow | undefined): Account {
     balance: balance?.balance_cents != null ? centsFromDb(balance.balance_cents) : centsFromDb(row.initial_balance_cents),
     transactionCount: balance?.transaction_count ?? 0,
     lastTransactionOn: optionalDate(balance?.last_transaction_on ?? null),
+    creditLimit: row.credit_limit_cents != null ? centsFromDb(row.credit_limit_cents) : null,
   }
 }
 
@@ -151,6 +155,7 @@ export type AccountUpdate = {
   name: string
   institution: string | null
   iban?: string | null
+  creditLimit?: Cents | null
   color: string | null
   initialBalance: Cents
   initialBalanceOn: IsoDate | null
@@ -166,6 +171,7 @@ export async function updateAccount(db: DbClient, id: string, update: AccountUpd
       name: update.name,
       institution: update.institution,
       ...(update.iban !== undefined ? { iban: update.iban } : {}),
+      ...(update.creditLimit !== undefined ? { credit_limit_cents: update.creditLimit } : {}),
       color: update.color,
       initial_balance_cents: update.initialBalance,
       initial_balance_on: update.initialBalanceOn,

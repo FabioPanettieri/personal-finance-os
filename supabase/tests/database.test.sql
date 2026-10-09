@@ -558,6 +558,27 @@ select tests.throws(
 delete from public.investment_valuations where instrument_id = :'a_etf';
 delete from public.transactions where id in (:'l1', :'l2', :'l3', :'l4');
 
+-- 0012: carta di credito senza dettaglio (spesa dall'addebito) + plafond
+select id as a_card from public.accounts where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and name = 'Carta di credito' \gset
+insert into public.transfer_groups (user_id, kind, detected_by, confidence)
+values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'internal', 'auto', 0.95) returning id as card_group \gset
+insert into public.transactions (user_id, account_id, booked_on, description, original_description, amount_cents, type, nature, transfer_group_id, source, fingerprint)
+values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', :'a_card', '2026-09-10', 'Da ING', 'Estratto conto carta', 82983, 'transfer', 'transfer', :'card_group', 'csv_import', tests.fp('card-mirror'))
+returning id as card_mirror \gset
+select tests.ok(
+  (select count(*) = 1 and sum(amount_cents) = -82983 from public.transactions t
+   join public.transaction_categories c on c.id = t.category_id
+   where t.account_id = :'a_card' and t.type = 'expense' and c.name = 'Carta di credito'),
+  '0012: l''addebito sulla carta diventa una spesa "Carta di credito"');
+select tests.ok((select balance_cents = 0 from public.account_balances where account_id = :'a_card'), '0012: saldo della carta a zero');
+delete from public.transactions where id = :'card_mirror';
+select tests.ok(not exists (select 1 from public.transactions where account_id = :'a_card'), '0012: tolto l''addebito sparisce anche la spesa');
+delete from public.transfer_groups where id = :'card_group';
+select tests.throws(format('update public.accounts set credit_limit_cents = 0 where id = %L', :'a_card'), '23514', '0012: plafond maggiore di zero');
+update public.accounts set credit_limit_cents = 200000 where id = :'a_card';
+select tests.ok((select credit_limit_cents = 200000 from public.accounts where id = :'a_card'), '0012: plafond salvato');
+select tests.ok(not has_function_privilege('anon', 'public.card_spending_category(uuid)', 'execute'), '0012: anon non crea categorie');
+
 reset role;
 
 select tests.ok(
