@@ -4,7 +4,7 @@ import { IMPORTERS } from '@/lib/imports/importers'
 import type { ImportSource } from '@/lib/imports/types'
 import { centsFromDb, type Cents } from '@/lib/money'
 import { typesFor, type TransactionFilters } from '@/lib/transactions/filters'
-import { findChoice } from '@/lib/transactions/quick-choices'
+import { findChoice, type QuickChoice } from '@/lib/transactions/quick-choices'
 
 import { RepositoryError, type DbClient } from './accounts'
 import { linkTransfer, transferCandidates, unlinkTransfer } from './transfers'
@@ -55,6 +55,31 @@ export async function listTransactions(
   categoryIds: string[] | null,
 ): Promise<TransactionPage> {
   const page = filters.page
+  const from = (page - 1) * TRANSACTIONS_PAGE_SIZE
+  const { items, total } = await queryTransactions(db, filters, categoryIds, from, from + TRANSACTIONS_PAGE_SIZE - 1)
+  return { items, total, page, pageSize: TRANSACTIONS_PAGE_SIZE }
+}
+
+/** Massimo di movimenti per una modifica di gruppo ("seleziona tutti i risultati"). */
+export const BULK_LIMIT = 1000
+
+/** Id dei movimenti che corrispondono ai filtri (al massimo BULK_LIMIT) e totale. */
+export async function matchingTransactionIds(
+  db: DbClient,
+  filters: TransactionFilters,
+  categoryIds: string[] | null,
+): Promise<{ ids: string[]; amounts: Cents[]; total: number }> {
+  const { items, total } = await queryTransactions(db, filters, categoryIds, 0, BULK_LIMIT - 1)
+  return { ids: items.map((i) => i.id), amounts: items.map((i) => i.amount), total }
+}
+
+async function queryTransactions(
+  db: DbClient,
+  filters: TransactionFilters,
+  categoryIds: string[] | null,
+  rangeFrom: number,
+  rangeTo: number,
+): Promise<{ items: TransactionListItem[]; total: number }> {
   let query = db
     .from('transactions')
     .select(
@@ -77,11 +102,12 @@ export async function listTransactions(
     const escaped = filters.query.replace(/[\\%_]/g, (c) => `\\${c}`)
     query = query.ilike('description', `%${escaped}%`)
   }
-  const from = (page - 1) * TRANSACTIONS_PAGE_SIZE
+  if (filters.sort === 'amount-asc') query = query.order('amount_cents', { ascending: true })
+  else if (filters.sort === 'amount-desc') query = query.order('amount_cents', { ascending: false })
   const { data, error, count } = await query
     .order('booked_on', { ascending: false })
     .order('id', { ascending: false })
-    .range(from, from + TRANSACTIONS_PAGE_SIZE - 1)
+    .range(rangeFrom, rangeTo)
   if (error) fail('Lettura movimenti', error)
   return {
     items: data.map((r) => {
@@ -106,8 +132,6 @@ export async function listTransactions(
       }
     }),
     total: count ?? 0,
-    page,
-    pageSize: TRANSACTIONS_PAGE_SIZE,
   }
 }
 
@@ -136,6 +160,10 @@ export type TransactionDetail = {
   importInfo: { id: string; bankProfile: string; createdAt: string } | null
   /** Gruppo del trasferimento (null se non collegato). */
   transferGroupId: string | null
+  notes: string | null
+  categoryId: string | null
+  businessId: string | null
+  incomeSourceId: string | null
   /** Altre gambe dello stesso trasferimento. */
   transferLegs: { id: string; accountName: string; amount: Cents; bookedOn: IsoDate }[]
 }
@@ -208,6 +236,10 @@ export async function getTransaction(db: DbClient, id: string): Promise<Transact
     source: row.source,
     importInfo: row.imports ? { id: row.imports.id, bankProfile: row.imports.bank_profile, createdAt: row.imports.created_at } : null,
     transferGroupId: row.transfer_group_id,
+    notes: row.notes,
+    categoryId: row.category_id,
+    businessId: row.business_id,
+    incomeSourceId: row.income_source_id,
     transferLegs: legs,
   }
 }
@@ -252,6 +284,24 @@ export async function confirmTransaction(db: DbClient, id: string): Promise<bool
 
 export type ClassifyResult = { ok: true; ruleCreated: boolean; linked: boolean } | { ok: false; error: string }
 
+/** Id di categoria, business e fonte di una scelta rapida, risolti sui dati dell'utente. */
+async function resolveChoice(db: DbClient, choice: QuickChoice): Promise<{ categoryId: string | null; businessId: string | null; incomeSourceId: string | null }> {
+  const [path0, path1] = (choice.categoryPath ?? '').split(' > ')
+  const [categories, business, source] = await Promise.all([
+    choice.categoryPath ? db.from('transaction_categories').select('id, name, parent_id').in('name', [path0!, path1].filter(Boolean) as string[]) : Promise.resolve({ data: [], error: null }),
+    choice.businessSlug ? db.from('businesses').select('id').eq('slug', choice.businessSlug).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    choice.incomeSourceName ? db.from('income_sources').select('id').eq('name', choice.incomeSourceName).maybeSingle() : Promise.resolve({ data: null, error: null }),
+  ])
+  if (categories.error) fail('Lettura categorie', categories.error)
+  const rows = categories.data ?? []
+  const root = rows.find((c) => c.name === path0 && c.parent_id === null)
+  return {
+    categoryId: path1 ? (rows.find((c) => c.name === path1 && c.parent_id === root?.id)?.id ?? null) : (root?.id ?? null),
+    businessId: business.data?.id ?? null,
+    incomeSourceId: choice.type === 'income' ? (source.data?.id ?? null) : null,
+  }
+}
+
 /**
  * "Sistema" un movimento con una scelta rapida: imposta tipo, natura,
  * categoria, business e fonte, e lo segna come confermato. Con `remember`
@@ -266,18 +316,7 @@ export async function classifyTransaction(db: DbClient, id: string, choiceKey: s
   const choice = findChoice(amount, choiceKey)
   if (!choice) return { ok: false, error: 'Scelta non valida per questo movimento' }
 
-  const [path0, path1] = (choice.categoryPath ?? '').split(' > ')
-  const [categories, business, source] = await Promise.all([
-    choice.categoryPath ? db.from('transaction_categories').select('id, name, parent_id').in('name', [path0!, path1].filter(Boolean) as string[]) : Promise.resolve({ data: [], error: null }),
-    choice.businessSlug ? db.from('businesses').select('id').eq('slug', choice.businessSlug).maybeSingle() : Promise.resolve({ data: null, error: null }),
-    choice.incomeSourceName ? db.from('income_sources').select('id').eq('name', choice.incomeSourceName).maybeSingle() : Promise.resolve({ data: null, error: null }),
-  ])
-  if (categories.error) fail('Lettura categorie', categories.error)
-  const rows = categories.data ?? []
-  const root = rows.find((c) => c.name === path0 && c.parent_id === null)
-  const categoryId = path1 ? (rows.find((c) => c.name === path1 && c.parent_id === root?.id)?.id ?? null) : (root?.id ?? null)
-  const businessId = business.data?.id ?? null
-  const incomeSourceId = choice.type === 'income' ? (source.data?.id ?? null) : null
+  const { categoryId, businessId, incomeSourceId } = await resolveChoice(db, choice)
   const internal = choice.type === 'transfer' || choice.type === 'investment'
 
   // Non è più un trasferimento: si scioglie il gruppo (l'altra metà resta "da abbinare").
@@ -338,4 +377,101 @@ export async function classifyTransaction(db: DbClient, id: string, choiceKey: s
     if (candidates.length === 1 && internalCandidates.length === 1) linked = (await linkTransfer(db, id, internalCandidates[0]!.id)).ok
   }
   return { ok: true, ruleCreated, linked }
+}
+
+export type BulkResult = { ok: true; updated: number; skipped: number } | { ok: false; error: string }
+
+/** Conferma la classificazione proposta di più movimenti. */
+export async function bulkConfirm(db: DbClient, ids: string[]): Promise<BulkResult> {
+  if (ids.length === 0) return { ok: true, updated: 0, skipped: 0 }
+  if (ids.length > BULK_LIMIT) return { ok: false, error: `Al massimo ${BULK_LIMIT} movimenti alla volta` }
+  const { data, error } = await db.rpc('bulk_confirm_transactions', { p_ids: ids })
+  if (error) fail('Conferma di gruppo', error)
+  return { ok: true, updated: data, skipped: ids.length - data }
+}
+
+/**
+ * Classifica più movimenti con la stessa scelta rapida. La scelta dipende dal
+ * segno (`direction`): i movimenti con il segno opposto restano invariati.
+ */
+export async function bulkClassify(db: DbClient, ids: string[], choiceKey: string, direction: 'in' | 'out'): Promise<BulkResult> {
+  if (ids.length === 0) return { ok: true, updated: 0, skipped: 0 }
+  if (ids.length > BULK_LIMIT) return { ok: false, error: `Al massimo ${BULK_LIMIT} movimenti alla volta` }
+  const choice = findChoice(direction === 'in' ? 1 : -1, choiceKey)
+  if (!choice) return { ok: false, error: 'Scelta non valida' }
+  const { categoryId, businessId, incomeSourceId } = await resolveChoice(db, choice)
+  const { data, error } = await db.rpc('bulk_classify_transactions', {
+    p_ids: ids,
+    p_type: choice.type,
+    p_nature: choice.nature,
+    // Le funzioni accettano null: i tipi generati non lo indicano per i parametri senza default.
+    p_category: categoryId as string,
+    p_business: businessId as string,
+    p_income_source: incomeSourceId as string,
+  })
+  if (error) fail('Classificazione di gruppo', error)
+  return { ok: true, updated: data, skipped: ids.length - data }
+}
+
+export type EditableCategory = { id: string; name: string; parentName: string | null; kind: string }
+
+/** Categorie selezionabili, con il nome della macro-categoria per l'elenco. */
+export async function editableCategories(db: DbClient): Promise<EditableCategory[]> {
+  const { data, error } = await db.from('transaction_categories').select('id, name, parent_id, kind, sort_order').order('sort_order')
+  if (error) fail('Categorie', error)
+  const names = new Map(data.map((c) => [c.id, c.name]))
+  return data
+    .map((c) => ({ id: c.id, name: c.name, parentName: c.parent_id ? (names.get(c.parent_id) ?? null) : null, kind: c.kind }))
+    .sort((a, b) => (a.parentName ?? a.name).localeCompare(b.parentName ?? b.name, 'it') || (a.parentName === null ? -1 : b.parentName === null ? 1 : a.name.localeCompare(b.name, 'it')))
+}
+
+/** Tipo di categoria compatibile con il tipo di movimento (un rimborso usa le categorie di spesa). */
+export function categoryKindFor(type: TxType): string {
+  return type === 'refund' ? 'expense' : type
+}
+
+export type DetailsInput = {
+  description: string
+  notes: string | null
+  categoryId: string | null
+  businessId: string | null
+  incomeSourceId: string | null
+}
+
+export type DetailsResult = { ok: true } | { ok: false; error: string; field?: keyof DetailsInput }
+
+/** Modifica descrizione, note, categoria, business e fonte (il tipo si cambia con le scelte rapide). */
+export async function updateTransactionDetails(db: DbClient, id: string, input: DetailsInput): Promise<DetailsResult> {
+  const { data: tx, error } = await db.from('transactions').select('id, type').eq('id', id).maybeSingle()
+  if (error) fail('Lettura movimento', error)
+  if (!tx) return { ok: false, error: 'Movimento non trovato' }
+  const description = input.description.trim()
+  if (description.length < 1 || description.length > 500) return { ok: false, error: 'Scrivi una descrizione (massimo 500 caratteri)', field: 'description' }
+  const notes = input.notes?.trim() || null
+  if (notes && notes.length > 2000) return { ok: false, error: 'Note troppo lunghe (massimo 2000 caratteri)', field: 'notes' }
+
+  if (input.categoryId) {
+    const { data: category } = await db.from('transaction_categories').select('kind').eq('id', input.categoryId).maybeSingle()
+    if (!category || category.kind !== categoryKindFor(tx.type)) return { ok: false, error: 'Categoria non adatta a questo movimento', field: 'categoryId' }
+  }
+  const internal = tx.type === 'transfer' || tx.type === 'investment'
+  if (input.businessId && internal) return { ok: false, error: 'Un trasferimento non appartiene a un business', field: 'businessId' }
+  if (input.incomeSourceId && tx.type !== 'income') return { ok: false, error: 'La fonte di reddito vale solo per le entrate', field: 'incomeSourceId' }
+
+  const { error: e } = await db
+    .from('transactions')
+    .update({
+      description,
+      notes,
+      category_id: input.categoryId,
+      business_id: internal ? null : input.businessId,
+      income_source_id: tx.type === 'income' ? input.incomeSourceId : null,
+      // Chi modifica a mano conferma anche la classificazione.
+      is_categorized: true,
+      categorization_method: 'manual',
+      categorization_confidence: 1,
+    })
+    .eq('id', id)
+  if (e) fail('Modifica movimento', e)
+  return { ok: true }
 }

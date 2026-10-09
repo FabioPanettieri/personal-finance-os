@@ -1,11 +1,11 @@
-import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-import { TransactionRow } from '@/components/finance/transaction-row'
 import { accountColor } from '@/lib/banks'
 import { formatIsoDate, type IsoDate } from '@/lib/dates'
-import { parseTransactionFilters, transactionsHref, TYPE_FILTER_LABELS, type TransactionFilters } from '@/lib/transactions/filters'
+import { BulkTransactionList } from '@/features/transactions/components/bulk-list'
+import { parseTransactionFilters, SORT_LABELS, SORTS, transactionsHref, TYPE_FILTER_LABELS, TYPE_FILTERS, type TransactionFilters } from '@/lib/transactions/filters'
 import { cn } from '@/lib/utils/cn'
 import { requireUser } from '@/server/auth/session'
 import { listAccounts } from '@/server/repositories/accounts'
@@ -15,6 +15,9 @@ import { unmatchedTransferCount } from '@/server/repositories/transfers'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 
 export const metadata: Metadata = { title: 'Movimenti' }
+
+const field = 'flex flex-col gap-1 text-[13px] font-medium text-fg-muted'
+const control = 'h-11 rounded-[12px] border border-line bg-surface-2 px-3 text-[15px] text-fg'
 
 const chip = (active: boolean) =>
   cn(
@@ -83,7 +86,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
       </header>
 
       <form method="get" action="/transactions" className="mb-4">
-        {Object.entries({ from: filters.from, to: filters.to, type: filters.type, account: filters.accountId, category: filters.categoryId, business: filters.businessId, source: filters.incomeSourceId, status: filters.review ? 'review' : filters.unmatched ? 'unmatched' : null })
+        {Object.entries({ from: filters.from, to: filters.to, type: filters.type, account: filters.accountId, category: filters.categoryId, business: filters.businessId, source: filters.incomeSourceId, status: filters.review ? 'review' : filters.unmatched ? 'unmatched' : null, sort: filters.sort === 'date' ? null : filters.sort })
           .filter(([, v]) => v)
           .map(([k, v]) => (
             <input key={k} type="hidden" name={k} value={v!} />
@@ -131,6 +134,86 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           ))}
       </nav>
 
+      <details className="group mb-4 rounded-[var(--radius-card)] border border-line bg-surface" open={false}>
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-[14px] font-semibold text-fg">
+          <span className="inline-flex items-center gap-2">
+            <SlidersHorizontal aria-hidden className="size-4 text-fg-muted" />
+            Filtri e ordinamento
+          </span>
+          <span className="text-[13px] font-medium text-fg-muted">{SORT_LABELS[filters.sort]}</span>
+        </summary>
+        <form method="get" action="/transactions" className="grid gap-3 border-t border-line p-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries({ q: filters.query, account: filters.accountId, status: filters.review ? 'review' : filters.unmatched ? 'unmatched' : null })
+            .filter(([, v]) => v)
+            .map(([k, v]) => (
+              <input key={k} type="hidden" name={k} value={v!} />
+            ))}
+          <label className={field}>
+            Dal
+            <input type="date" name="from" defaultValue={filters.from ?? ''} className={control} />
+          </label>
+          <label className={field}>
+            Al
+            <input type="date" name="to" defaultValue={filters.to ?? ''} className={control} />
+          </label>
+          <label className={field}>
+            Tipo
+            <select name="type" defaultValue={filters.type ?? ''} className={control}>
+              <option value="">Tutti</option>
+              {TYPE_FILTERS.map((t) => (
+                <option key={t} value={t}>
+                  {TYPE_FILTER_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={field}>
+            Categoria
+            <select name="category" defaultValue={filters.categoryId ?? ''} className={control}>
+              <option value="">Tutte</option>
+              <option value="none">Senza categoria</option>
+              {tree
+                .filter((c) => c.parentId === null)
+                .sort((a, b) => a.name.localeCompare(b.name, 'it'))
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label className={field}>
+            Business
+            <select name="business" defaultValue={filters.businessId ?? ''} className={control}>
+              <option value="">Tutti</option>
+              {businesses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={field}>
+            Ordina per
+            <select name="sort" defaultValue={filters.sort} className={control}>
+              {SORTS.map((o) => (
+                <option key={o} value={o}>
+                  {SORT_LABELS[o]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-center gap-3 sm:col-span-2 lg:col-span-3">
+            <button type="submit" className="h-11 rounded-full bg-fg px-6 text-sm font-semibold text-canvas">
+              Applica
+            </button>
+            <Link href="/transactions" className="text-sm font-medium text-fg-muted hover:text-fg">
+              Azzera tutto
+            </Link>
+          </div>
+        </form>
+      </details>
+
       {extra.length > 0 || filters.query ? (
         <ul aria-label="Filtri attivi" className="mb-4 flex flex-wrap items-center gap-2">
           {[...extra, ...(filters.query ? [{ label: `“${filters.query}”`, remove: { query: null } }] : [])].map((f) => (
@@ -157,20 +240,15 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           </p>
         </div>
       ) : (
-        <ul aria-label="Movimenti" className="flex flex-col gap-5">
-          {groupByDay(result.items).map((group) => (
-            <li key={group.day}>
-              <h2 className="mb-2 px-1 text-[11px] font-semibold tracking-[0.08em] text-fg-subtle uppercase">{formatIsoDate(group.day, 'long')}</h2>
-              <ul className="rounded-[var(--radius-card)] border border-line bg-surface px-3 py-1">
-                {group.items.map((t) => (
-                  <li key={t.id} data-testid="transaction-row">
-                    <TransactionRow tx={t} />
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
+        <BulkTransactionList
+          total={result.total}
+          filters={transactionsHref({ ...filters, page: 1 }).split('?')[1] ?? ''}
+          groups={
+            filters.sort === 'date'
+              ? groupByDay(result.items).map((g) => ({ day: g.day, label: formatIsoDate(g.day, 'long'), items: g.items }))
+              : [{ day: filters.sort, label: SORT_LABELS[filters.sort], items: result.items }]
+          }
+        />
       )}
 
       {pages > 1 ? (

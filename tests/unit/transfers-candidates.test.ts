@@ -58,3 +58,13 @@ describe('filtro "da abbinare"', () => {
     expect(parseTransactionFilters({}).unmatched).toBe(false)
   })
 })
+
+describe('ordinamento', () => {
+  it('sort nell\'URL, "più recenti" di default e non scritto', () => {
+    expect(parseTransactionFilters({}).sort).toBe('date')
+    expect(parseTransactionFilters({ sort: 'amount-asc' }).sort).toBe('amount-asc')
+    expect(parseTransactionFilters({ sort: 'boh' }).sort).toBe('date')
+    expect(transactionsHref({ sort: 'amount-desc' })).toBe('/transactions?sort=amount-desc')
+    expect(transactionsHref({ sort: 'date' })).toBe('/transactions')
+  })
+})

@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { z } from 'zod'
 
 import { Money } from '@/components/ui/money'
+import { EditDetails } from '@/features/transactions/components/edit-details'
 import { QuickClassify } from '@/features/transactions/components/quick-classify'
 import { TransferCandidates, UnlinkTransferButton } from '@/features/transactions/components/transfer-actions'
 import { NATURE_LABELS, SOURCE_LABELS, TYPE_LABELS } from '@/features/transactions/labels'
@@ -14,7 +15,8 @@ import { formatIsoDate } from '@/lib/dates'
 import { choicesFor } from '@/lib/transactions/quick-choices'
 import { cn } from '@/lib/utils/cn'
 import { requireUser } from '@/server/auth/session'
-import { getTransaction } from '@/server/repositories/transactions'
+import { businessList, incomeSourceList } from '@/server/repositories/dashboard'
+import { categoryKindFor, editableCategories, getTransaction } from '@/server/repositories/transactions'
 import { transferCandidates } from '@/server/repositories/transfers'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 
@@ -38,7 +40,12 @@ export default async function TransactionPage({ params }: { params: Promise<{ id
   const db = await createSupabaseServerClient()
   const t = await getTransaction(db, id)
   if (!t) notFound()
-  const candidates = t.transferGroupId ? [] : await transferCandidates(db, t.id)
+  const [candidates, categories, businesses, sources] = await Promise.all([
+    t.transferGroupId ? [] : transferCandidates(db, t.id),
+    editableCategories(db),
+    businessList(db),
+    incomeSourceList(db),
+  ])
   const internal = t.type === 'transfer' || t.type === 'investment'
   const color = accountColor({ name: t.account.name, institution: t.account.institution })
   const currentLabel = [TYPE_LABELS[t.type], t.business ?? t.category].filter(Boolean).join(' · ')
@@ -100,6 +107,7 @@ export default async function TransactionPage({ params }: { params: Promise<{ id
               </>
             ) : null}
           </Row>
+          <Row label="Note">{t.notes ? <span className="whitespace-pre-line">{t.notes}</span> : null}</Row>
           <Row label="Testo della banca">
             <span className="text-sm text-fg-muted">{t.originalDescription}</span>
           </Row>
@@ -142,6 +150,21 @@ export default async function TransactionPage({ params }: { params: Promise<{ id
           )}
         </section>
       ) : null}
+
+      <details className="mb-6 rounded-[var(--radius-card)] border border-line bg-surface p-5">
+        <summary className="cursor-pointer text-[15px] font-semibold text-fg">Modifica descrizione, categoria e note</summary>
+        <div className="mt-4">
+          <EditDetails
+            id={t.id}
+            values={{ description: t.description, notes: t.notes, categoryId: t.categoryId, businessId: t.businessId, incomeSourceId: t.incomeSourceId }}
+            categories={categories.filter((c) => c.kind === categoryKindFor(t.type))}
+            businesses={businesses}
+            sources={sources}
+            showBusiness={!internal}
+            showSource={t.type === 'income'}
+          />
+        </div>
+      </details>
 
       {t.isCategorized ? (
         <details className="rounded-[var(--radius-card)] border border-line bg-surface p-5">

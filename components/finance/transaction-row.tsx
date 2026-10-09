@@ -30,13 +30,14 @@ const ICONS = { income: ArrowDownLeft, expense: ArrowUpRight, refund: RotateCcw,
  * categoria, importo. I movimenti tra conti propri hanno importo neutro: non
  * sono né entrate né spese. "Da sistemare" in evidenza.
  */
-export function TransactionRow({ tx, showDate = false }: { tx: TransactionRowData; showDate?: boolean }) {
+/** `link = false`: solo contenuto (es. in modalità selezione, dove il tocco seleziona la riga). */
+export function TransactionRow({ tx, showDate = false, link = true }: { tx: TransactionRowData; showDate?: boolean; link?: boolean }) {
   const Icon = ICONS[tx.type]
   const internal = tx.type === 'transfer' || tx.type === 'investment'
   const color = accountColor({ institution: tx.accountInstitution, name: tx.accountName })
   const detail = internal ? (tx.type === 'transfer' ? 'Tra i tuoi conti' : 'Investimento') : (tx.businessName ?? tx.categoryName)
   return (
-    <Link href={`/transactions/${tx.id}`} className="-mx-2 flex items-center gap-3 rounded-[14px] px-2 py-2.5 transition-colors hover:bg-surface-2">
+    <Wrapper tx={tx} link={link}>
       <span
         aria-hidden
         className="grid size-10 shrink-0 place-items-center rounded-full"
@@ -61,6 +62,17 @@ export function TransactionRow({ tx, showDate = false }: { tx: TransactionRowDat
         signDisplay={internal ? 'never' : 'exceptZero'}
         className={cn('shrink-0 text-[15px] font-semibold', internal ? 'text-fg-muted' : tx.amount > 0 ? 'text-positive' : 'text-fg')}
       />
+    </Wrapper>
+  )
+}
+
+function Wrapper({ tx, link, children }: { tx: TransactionRowData; link: boolean; children: React.ReactNode }) {
+  const className = '-mx-2 flex min-w-0 flex-1 items-center gap-3 rounded-[14px] px-2 py-2.5 transition-colors hover:bg-surface-2'
+  return link ? (
+    <Link href={`/transactions/${tx.id}`} className={className}>
+      {children}
     </Link>
+  ) : (
+    <span className={className}>{children}</span>
   )
 }

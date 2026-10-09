@@ -288,5 +288,30 @@ entrate scendono quando una ricarica viene riconosciuta come giroconto.
 
 **Database**: migration 0008 (vincoli + 2 funzioni, nessuna tabella).
 
-**Da ricordare all'utente**: backup automatico del database locale
-(rimandato su richiesta, da proporre al prossimo report).
+
+## SPRINT 6 — COMPLETED (Explorer dei movimenti)
+
+La dashboard prevista dallo Sprint 6 era già stata anticipata nello Sprint 4
+(hero patrimonio, KPI, spese per categoria, entrate per fonte in Business,
+numeri verificati dai test). Lo Sprint 6 completa quindi l'explorer rimasto
+dallo Sprint 4 originale.
+
+**Implemented**
+- Movimenti: "Seleziona" → selezione multipla (o tutti i risultati dei
+  filtri, max 1000) → Conferma o "Classifica come…" con le scelte rapide; le
+  scelte da uscita non toccano le entrate selezionate (e viceversa).
+- Pannello "Filtri e ordinamento": periodo, tipo, categoria, business,
+  ordinamento (più recenti, spese più grandi, entrate più grandi); tutto nell'URL.
+- Dettaglio movimento: modifica di descrizione, categoria e sottocategoria
+  (solo del tipo giusto), business, fonte di reddito e note.
+- Migration 0009: `bulk_confirm_transactions` e `bulk_classify_transactions`
+  (SECURITY INVOKER, array nel corpo, max 1000; un trasferimento riclassificato
+  esce dal suo gruppo).
+
+**Acceptance**: filtri via URL; modifica di gruppo su 500 movimenti in un
+colpo (test di integrazione, < 5 s sullo stack locale).
+
+**Database**: migration 0009 (2 funzioni, nessuna tabella).
+
+**Da ricordare all'utente**: backup automatico del database locale (rimandato
+su richiesta).

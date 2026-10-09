@@ -507,7 +507,24 @@ select tests.ok(
   '0008: dopo lo scollegamento restano trasferimenti da abbinare, il gruppo è eliminato');
 select tests.throws(format('select public.unlink_transfer(%L)', :'l_group'), 'P0002', '0008: gruppo inesistente');
 
-select public.unlink_transfer(:'l_inv');
+
+-- 0009: modifica di gruppo
+select tests.ok(
+  public.bulk_classify_transactions(array[:'l1', :'l2', :'l4']::uuid[], 'expense', 'personal', :'a_casa', null, null) = 2,
+  '0009: classifica solo i movimenti col segno compatibile (2 uscite su 3)');
+select tests.ok(
+  (select type = 'transfer' from public.transactions where id = :'l2')
+  and (select type = 'expense' and category_id = :'a_casa' and transfer_group_id is null from public.transactions where id = :'l4'),
+  '0009: l''entrata resta invariata; la metà riclassificata esce dal trasferimento');
+select tests.ok(
+  not exists (select 1 from public.transfer_groups where id = :'l_inv')
+  and (select transfer_group_id is null from public.transactions where id = :'l3'),
+  '0009: il gruppo sciolto non lascia metà orfane');
+update public.transactions set is_categorized = false, categorization_method = 'rule' where id in (:'l1', :'l4');
+select tests.ok(public.bulk_confirm_transactions(array[:'l1', :'l4', :'l2']::uuid[]) = 2, '0009: conferma di gruppo (solo i non confermati)');
+select tests.throws(
+  format('select public.bulk_confirm_transactions(array(select gen_random_uuid() from generate_series(1, 1001)))'),
+  '23514', '0009: al massimo 1000 movimenti alla volta');
 delete from public.transactions where id in (:'l1', :'l2', :'l3', :'l4');
 
 reset role;

@@ -1582,6 +1582,18 @@ export type Database = {
       }
     }
     Functions: {
+      bulk_classify_transactions: {
+        Args: {
+          p_business: string
+          p_category: string
+          p_ids: string[]
+          p_income_source: string
+          p_nature: Database['public']['Enums']['transaction_nature']
+          p_type: Database['public']['Enums']['transaction_type']
+        }
+        Returns: number
+      }
+      bulk_confirm_transactions: { Args: { p_ids: string[] }; Returns: number }
       category_id_by_path: { Args: { p_path: string; p_user_id: string }; Returns: string }
       dashboard_account_changes: {
         Args: { p_from: string; p_to: string }

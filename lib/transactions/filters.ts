@@ -21,6 +21,15 @@ export function typesFor(filter: TypeFilter): ('income' | 'expense' | 'refund' |
   return filter === 'spending' ? ['expense', 'refund'] : [filter]
 }
 
+export const SORTS = ['date', 'amount-asc', 'amount-desc'] as const
+export type Sort = (typeof SORTS)[number]
+
+export const SORT_LABELS: Record<Sort, string> = {
+  date: 'Più recenti',
+  'amount-asc': 'Spese più grandi',
+  'amount-desc': 'Entrate più grandi',
+}
+
 export type TransactionFilters = {
   from: IsoDate | null
   to: IsoDate | null
@@ -36,6 +45,7 @@ export type TransactionFilters = {
   /** Solo trasferimenti/versamenti senza l'altra metà collegata. */
   unmatched: boolean
   query: string | null
+  sort: Sort
   page: number
 }
 
@@ -72,6 +82,7 @@ export function parseTransactionFilters(params: Params): TransactionFilters {
     review: first(params, 'status') === 'review',
     unmatched: first(params, 'status') === 'unmatched',
     query: query ? query.slice(0, 100) : null,
+    sort: (SORTS as readonly string[]).includes(first(params, 'sort') ?? '') ? (first(params, 'sort') as Sort) : 'date',
     page: Number.isInteger(page) && page >= 1 && page <= 10_000 ? page : 1,
   }
 }
@@ -89,6 +100,7 @@ export function transactionsHref(filters: Partial<Omit<TransactionFilters, 'page
   if (filters.review) params.set('status', 'review')
   else if (filters.unmatched) params.set('status', 'unmatched')
   if (filters.query) params.set('q', filters.query)
+  if (filters.sort && filters.sort !== 'date') params.set('sort', filters.sort)
   if (filters.page && filters.page > 1) params.set('page', String(filters.page))
   const search = params.toString()
   return search ? `/transactions?${search}` : '/transactions'

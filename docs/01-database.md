@@ -94,6 +94,8 @@ erDiagram
   possono stare in un gruppo (check `transactions_transfer_group_internal`).
   `link_transfer(a, b)` e `unlink_transfer(gruppo)` (SECURITY INVOKER, RLS +
   AAL2) collegano e scollegano in modo atomico.
+  Dalla 0009: `bulk_confirm_transactions(ids)` e `bulk_classify_transactions(ids, …)`
+  per la modifica di gruppo (max 1000 id, solo i movimenti col segno compatibile).
 
 ### Import
 - **import_profiles** — mapping per banca (encoding, delimitatore, formato data,
