@@ -16,7 +16,7 @@ export const PRIMARY_NAV: readonly NavItem[] = [
   { href: '/', label: 'Home', icon: House },
   { href: '/transactions', label: 'Movimenti', icon: ArrowLeftRight },
   { href: '/imports/new', label: 'Importa', icon: Plus, primary: true, matches: ['/imports'] },
-  { href: '/accounts', label: 'Conti', icon: Landmark },
+  { href: '/accounts', label: 'Conti', icon: Landmark, matches: ['/investments'] },
   { href: '/business', label: 'Business', icon: Briefcase },
 ]
 

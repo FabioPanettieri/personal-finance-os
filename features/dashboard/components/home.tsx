@@ -160,7 +160,12 @@ export function NetWorthHero({
         ))}
       </ul>
       {breakdown.investedAtCost !== 0 ? (
-        <p className="text-xs text-fg-subtle">Investimenti al prezzo d’acquisto: il valore di mercato non è ancora disponibile.</p>
+        <p className="text-xs text-fg-subtle">
+          Investimenti al prezzo d’acquisto.{' '}
+          <Link href="/investments" className="font-medium text-fg-muted underline-offset-2 hover:text-fg hover:underline">
+            Valore di mercato e rendimento →
+          </Link>
+        </p>
       ) : null}
     </section>
   )

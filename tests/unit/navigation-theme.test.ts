@@ -46,3 +46,9 @@ describe('tema', () => {
     expect(nextThemePreference('dark')).toBe('system')
   })
 })
+
+describe('investimenti', () => {
+  it('la pagina Investimenti tiene evidenziata la voce Conti', () => {
+    expect(activePrimaryHref('/investments')).toBe('/accounts')
+  })
+})

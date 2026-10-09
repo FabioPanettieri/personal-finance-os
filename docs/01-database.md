@@ -98,6 +98,8 @@ erDiagram
   per la modifica di gruppo (max 1000 id, solo i movimenti col segno compatibile).
 - Dalla 0010 la natura di entrate/spese/rimborsi è derivata dal business
   (`business_id` presente ⇔ `nature = business`, trigger `sync_transaction_nature`).
+- Dalla 0011 `investment_valuations.unit_price`: prezzo unitario inserito a mano;
+  il valore di uno strumento è quantità attuale × ultimo prezzo.
 
 ### Import
 - **import_profiles** — mapping per banca (encoding, delimitatore, formato data,

@@ -25,7 +25,7 @@ test('home: patrimonio, mese, conti con i colori delle banche, da sistemare e de
   const kpi = (id: string) => page.getByTestId(id)
   await expect(kpi('kpi-net-worth').getByLabel(euro(EXPECTED.netWorth))).toBeVisible()
   await expect(kpi('kpi-net-worth').getByRole('listitem').filter({ hasText: 'Liquidità' })).toContainText(euro(EXPECTED.liquidity))
-  await expect(kpi('kpi-net-worth')).toContainText('il valore di mercato non è ancora disponibile')
+  await expect(kpi('kpi-net-worth')).toContainText('Valore di mercato e rendimento')
   await expect(kpi('kpi-income')).toContainText(`+${euro(EXPECTED.september.income)}`)
   await expect(kpi('kpi-expenses')).toContainText(`-${euro(EXPECTED.september.expenses)}`)
   await expect(kpi('kpi-cash-flow')).toContainText('Ti restano')

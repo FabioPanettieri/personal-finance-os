@@ -1,5 +1,6 @@
-import { Landmark } from 'lucide-react'
+import { ChevronRight, Landmark, LineChart } from 'lucide-react'
 import type { Metadata } from 'next'
+import Link from 'next/link'
 
 import { AccountRow, BankCard } from '@/components/finance/bank-card'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -100,6 +101,20 @@ export default async function AccountsPage() {
             <p className="mt-3 text-xs text-fg-subtle">I soldi spostati tra i tuoi conti non cambiano il totale.</p>
           </section>
         ))}
+
+        <Link
+          href="/investments"
+          className="flex min-h-[72px] items-center gap-4 rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4 transition-colors hover:bg-surface-2"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-full text-white" style={{ background: 'var(--bank-tr)' }}>
+            <LineChart aria-hidden className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold text-fg">Investimenti</span>
+            <span className="block text-[13px] text-fg-muted">Valore dei titoli, rendimento e piani di accumulo</span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-fg-subtle" />
+        </Link>
 
         <section aria-labelledby="active-accounts">
           <h2 id="active-accounts" className="mb-3 text-[17px] font-semibold text-fg">

@@ -335,5 +335,26 @@ sposta l'importo tra i due gruppi senza cambiare il totale.
 
 **Database**: migration 0010 (1 trigger, 3 funzioni, riallineamento dati).
 
+
+## SPRINT 8 — COMPLETED (Investimenti)
+
+**Implemented**
+- `/investments` (da Conti e dalla Home; la voce Conti resta evidenziata):
+  valore attuale, rendimento (€ e %), versato netto, titoli, liquidità,
+  dividendi e interessi, per ogni conto di investimento (Trade Republic).
+- Posizioni a costo medio ponderato: quote, costo medio, valore, guadagno non
+  realizzato; guadagno realizzato sulle vendite.
+- Prezzo di oggi inserito a mano (nessuna API di prezzi): valore = quote ×
+  ultimo prezzo; senza prezzo i titoli valgono al costo e la pagina lo dice.
+- Piani di accumulo: aggiungi, metti in pausa, elimina; prossima esecuzione e
+  totale investito al mese.
+- Migration 0011: `investment_valuations.unit_price`.
+
+**Acceptance**: versamento ≠ rendimento — rendimento = (liquidità + titoli a
+valore di mercato) − versato netto; test unitari e di integrazione: un nuovo
+versamento aumenta valore e versato della stessa cifra, il rendimento non cambia.
+
+**Database**: migration 0011 (1 colonna).
+
 **Da ricordare all'utente**: backup automatico del database locale (rimandato
 su richiesta).

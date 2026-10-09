@@ -1150,6 +1150,7 @@ export type Database = {
           instrument_id: string | null
           market_value_cents: number
           source: string
+          unit_price: number | null
           user_id: string
           valued_on: string
         }
@@ -1160,6 +1161,7 @@ export type Database = {
           instrument_id?: string | null
           market_value_cents: number
           source?: string
+          unit_price?: number | null
           user_id?: string
           valued_on: string
         }
@@ -1170,6 +1172,7 @@ export type Database = {
           instrument_id?: string | null
           market_value_cents?: number
           source?: string
+          unit_price?: number | null
           user_id?: string
           valued_on?: string
         }

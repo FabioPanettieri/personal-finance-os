@@ -546,6 +546,16 @@ select tests.ok(
 select tests.ok(
   (select expense_cents = 3000 and category_id = :'a_casa' from public.business_category_spending(:'a_voxel', '2026-09-01', '2026-09-30')),
   '0010: spese del business per categoria');
+
+-- 0011: prezzo unitario delle valutazioni
+select id as a_etf from public.instruments where isin = 'IE00B4L5Y983' \gset
+insert into public.investment_valuations (account_id, instrument_id, valued_on, market_value_cents, unit_price)
+values (:'a_tr', :'a_etf', '2026-09-30', 95400, 95.4);
+select tests.ok((select unit_price = 95.4 from public.investment_valuations where instrument_id = :'a_etf'), '0011: prezzo unitario salvato');
+select tests.throws(
+  format($$insert into public.investment_valuations (account_id, instrument_id, valued_on, market_value_cents, unit_price) values (%L, %L, '2026-10-01', 0, 0)$$, :'a_tr', :'a_etf'),
+  '23514', '0011: prezzo unitario positivo');
+delete from public.investment_valuations where instrument_id = :'a_etf';
 delete from public.transactions where id in (:'l1', :'l2', :'l3', :'l4');
 
 reset role;
