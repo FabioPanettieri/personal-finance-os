@@ -1,3 +1,4 @@
+import { suggestionPattern } from '@/lib/categorization/learn'
 import { normalizeDescription } from '@/lib/csv/values'
 import { isIsoDate, type IsoDate } from '@/lib/dates'
 import { IMPORTERS } from '@/lib/imports/importers'
@@ -285,7 +286,7 @@ export async function confirmTransaction(db: DbClient, id: string): Promise<bool
 export type ClassifyResult = { ok: true; ruleCreated: boolean; linked: boolean } | { ok: false; error: string }
 
 /** Id di categoria, business e fonte di una scelta rapida, risolti sui dati dell'utente. */
-async function resolveChoice(db: DbClient, choice: QuickChoice): Promise<{ categoryId: string | null; businessId: string | null; incomeSourceId: string | null }> {
+export async function resolveChoice(db: DbClient, choice: QuickChoice): Promise<{ categoryId: string | null; businessId: string | null; incomeSourceId: string | null }> {
   const [path0, path1] = (choice.categoryPath ?? '').split(' > ')
   const [categories, business, source] = await Promise.all([
     choice.categoryPath ? db.from('transaction_categories').select('id, name, parent_id').in('name', [path0!, path1].filter(Boolean) as string[]) : Promise.resolve({ data: [], error: null }),
@@ -342,7 +343,8 @@ export async function classifyTransaction(db: DbClient, id: string, choiceKey: s
   if (updateError) fail('Aggiornamento movimento', updateError)
 
   let ruleCreated = false
-  const pattern = normalizeDescription(tx.description).slice(0, 120)
+  // Senza numeri variabili (date, riferimenti): la regola trova anche i prossimi movimenti.
+  const pattern = suggestionPattern(tx.description) || normalizeDescription(tx.description).slice(0, 120)
   if (remember && pattern.length >= 3) {
     const name = `Ricordato: ${tx.description}`.slice(0, 80)
     const { data: existing } = await db.from('categorization_rules').select('id').eq('name', name).maybeSingle()

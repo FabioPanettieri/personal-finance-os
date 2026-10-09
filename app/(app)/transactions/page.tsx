@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, Wand2, X } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
@@ -80,9 +80,15 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
 
   return (
     <>
-      <header className="mb-5">
-        <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg lg:text-[30px]">Movimenti</h1>
-        <p className="mt-1 text-[15px] text-fg-muted">{result.total === 1 ? '1 movimento' : `${result.total} movimenti`}</p>
+      <header className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[26px] font-bold tracking-[-0.02em] text-fg lg:text-[30px]">Movimenti</h1>
+          <p className="mt-1 text-[15px] text-fg-muted">{result.total === 1 ? '1 movimento' : `${result.total} movimenti`}</p>
+        </div>
+        <Link href="/rules" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-surface-2 px-4 text-sm font-medium text-fg-muted hover:text-fg">
+          <Wand2 aria-hidden className="size-4" />
+          Regole
+        </Link>
       </header>
 
       <form method="get" action="/transactions" className="mb-4">

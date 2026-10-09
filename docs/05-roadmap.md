@@ -396,5 +396,36 @@ integrazione (stessi numeri della Home; somma dei mesi = totale dell'anno).
 
 **Database**: nessuna migration (tabelle `goals` e `goal_accounts` dallo Sprint 0).
 
+
+## SPRINT 11 — COMPLETED (Classificazione intelligente)
+
+**Implemented**
+- `/rules` (da Movimenti, pulsante "Regole"): regole tue, imparate e
+  predefinite con condizione leggibile, affidabilità, "si applica da sola" /
+  "propone soltanto", quante volte è stata usata; attiva/disattiva, elimina,
+  cambia modalità.
+- Regole suggerite dalle correzioni: stesso testo classificato a mano nello
+  stesso modo almeno 2 volte (≥ 80% di accordo) e non coperto da una regola;
+  affidabilità che cresce con le conferme (2 → 85%, 3 → 90%, 4+ → 95%) e
+  scende con i disaccordi. Il testo cercato esclude numeri variabili (date,
+  riferimenti); stessa correzione per "Ricorda" dello Sprint 5.
+- Nuova regola guidata: testo, come (contiene/inizia/uguale), dove
+  (descrizione/controparte), uscite/entrate, cosa sono, importo da/a,
+  "classifica da solo" (95%) o "proponi soltanto" (70%); anteprima dei
+  movimenti già importati che corrispondono.
+- "Applica ai movimenti da sistemare": riapplica le regole attive ai movimenti
+  non confermati (non collegati a trasferimenti) e aggiorna l'uso delle regole.
+
+**Acceptance**: nessuna applicazione automatica sotto soglia — sotto il 90%
+la classificazione resta una proposta (`is_categorized = false`); test
+unitari e di integrazione.
+
+**AI opt-in**: non attivata per scelta. Richiederebbe di inviare le
+descrizioni dei movimenti a un servizio esterno: contrario al principio
+"i dati non lasciano il PC". Da valutare solo con un modello locale.
+
+**Database**: nessuna migration (`categorization_rules` già con affidabilità,
+origine e contatore d'uso).
+
 **Da ricordare all'utente**: backup automatico del database locale (rimandato
 su richiesta).

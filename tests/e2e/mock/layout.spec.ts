@@ -15,6 +15,7 @@ const PAGES = [
   { path: '/investments', heading: 'Investimenti' },
   { path: '/reports', heading: 'Report' },
   { path: '/goals', heading: 'Obiettivi' },
+  { path: '/rules', heading: 'Regole' },
 ]
 
 test.beforeEach(async ({ page, request }) => {
