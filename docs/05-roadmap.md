@@ -429,3 +429,44 @@ origine e contatore d'uso).
 
 **Da ricordare all'utente**: backup automatico del database locale (rimandato
 su richiesta).
+
+
+## SPRINT 12 — COMPLETED (Polish)
+
+**Implemented**
+- **Backup automatico** (`scripts/backup/`, docs/backup.md): dati di
+  `public`, `auth` (senza sessioni) e `storage` + file originali degli import,
+  in `Documenti\Finanze backup` (o `BACKUP_DIR`), ultime 30 copie, cifratura
+  AES-256-GCM facoltativa con `BACKUP_PASSWORD`. Parte da solo con "Avvia
+  Finanze" (prima delle migration) e una volta al giorno con l'avvio
+  automatico. `npm run backup` / `npm run restore` (transazione unica, backup
+  di sicurezza prima, conferma con RIPRISTINA).
+- **Impostazioni** riordinate (solo voci reali): Profilo e aspetto (nome del
+  saluto, fuso orario, tema), Sicurezza, Backup (ultimo backup, cifratura,
+  copie, come ripristinare), più i collegamenti a conti, regole, import,
+  business, investimenti, obiettivi, report. Avviso in Home se non c'è un
+  backup da 7 giorni.
+- **PWA completa**: service worker (`public/sw.js`) con pagina offline
+  ("Finanze non è raggiungibile": PC spento, Tailscale o rete) anche quando
+  Tailscale risponde ma l'app è spenta (502–504). Nessuna pagina o dato
+  finanziario in cache: solo file statici con hash (massimo 200) e la pagina
+  offline.
+- **Accessibilità**: axe WCAG 2.1 AA su tutte le pagine, scuro e chiaro, zero
+  violazioni. Corretti i contrasti di testo secondario, verde, rosso e ambra
+  (tema chiaro) e del grigio tenue (tema scuro); importi hero leggibili dagli
+  screen reader senza attributi non validi.
+- **Animazioni**: ingresso morbido delle pagine (260 ms), disattivato con
+  "riduci movimento".
+
+**Lighthouse** (`/login`, build di produzione): desktop Performance 100,
+Accessibility 100, Best Practices 96; mobile (telefono lento simulato)
+Performance 91, Accessibility 100, Best Practices 96. I punti mancanti di
+Best Practices vengono da scelte di privacy (pagine `no-store`, niente
+back/forward cache). La categoria PWA non esiste più in Lighthouse 12:
+installabilità e offline sono verificati dagli E2E.
+
+**Tests**: SQL 171 (Postgres temporaneo e Supabase locale), unit 333,
+integrazione 117, backup reale 1 (anche in CI), E2E locali 48 + 4 saltati
+per scelta, E2E con mock 24.
+
+**Database**: nessuna migration.

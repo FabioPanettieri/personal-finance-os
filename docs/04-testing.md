@@ -50,7 +50,13 @@
 | `npm run test:db:supabase` | Stessa suite SQL sul Postgres dello stack locale (schemi `auth`/`storage` veri), in una transazione annullata |
 | `npm run test:integration` | Vitest contro l'API locale: repository → supabase-js → PostgREST → Postgres → RLS |
 | `npm run test:e2e:local` | Playwright contro lo stack locale: login, TOTP reale (RFC 6238), sezione Conti |
+| `npm run test:backup` | Backup cifrato + ripristino reali sullo stack locale, con verifica dei conteggi (anche in CI) |
 | `npm run check` | typecheck, lint, unit, DB, build, E2E con mock |
+
+Accessibilità (Sprint 12): `tests/e2e/local/accessibility.spec.ts` esegue axe
+(WCAG 2.1 A/AA) su tutte le pagine con dati, in tema scuro e chiaro, più il
+login; zero violazioni ammesse. Lo stesso file verifica la PWA: service worker
+attivo, pagina offline senza rete, nessuna pagina con dati nella cache.
 
 Il finto Supabase implementa solo l'API GoTrue usata dall'app (password,
 refresh, utente, TOTP, logout) con JWT HS256 reali e un utente fittizio: il

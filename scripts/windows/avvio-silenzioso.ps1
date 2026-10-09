@@ -30,6 +30,8 @@ for ($i = 0; $i -lt 3; $i++) {
   if ($LASTEXITCODE -eq 0) { break }
   Start-Sleep -Seconds 10
 }
+# Backup giornaliero (salta se ce n'e' gia' uno recente): docs/backup.md
+node scripts\backup\backup.mjs --daily
 # Aggiornamenti del database (solo le migration nuove, i dati restano).
 npx.cmd supabase migration up --local
 if (-not (Test-Path '.env.local')) { npm.cmd run env:local }

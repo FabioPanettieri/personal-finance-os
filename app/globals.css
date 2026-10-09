@@ -15,15 +15,15 @@
   --line-strong: #d0d5dd;
   --fg: #0e1116;
   --fg-muted: #5b6472;
-  --fg-subtle: #8a93a3;
+  --fg-subtle: #646c7c;
   --accent: #4f5bd5;
   --accent-fg: #ffffff;
   --accent-soft: #eef0fc;
-  --positive: #1f8a5b;
+  --positive: #177048;
   --positive-soft: #e7f5ee;
-  --negative: #d1393f;
+  --negative: #bf2f37;
   --negative-soft: #fcebec;
-  --warning: #b7791f;
+  --warning: #94600f;
   --warning-soft: #fdf3e2;
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04);
   /* Serie dei grafici (identità, non stato): validate per daltonismo, light. */
@@ -45,7 +45,7 @@
   --line-strong: #343947;
   --fg: #f3f4f6;
   --fg-muted: #9aa1ae;
-  --fg-subtle: #6b7280;
+  --fg-subtle: #858c99;
   --accent: #f3f4f6;
   --accent-fg: #0a0b0f;
   --accent-soft: #1f232d;
@@ -98,6 +98,19 @@
   --shadow-card: var(--shadow-card);
 
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-enter: enter 260ms var(--ease-out-soft) both;
+
+  /* Ingresso delle pagine: leggero, senza spostare il layout (disattivato con "riduci movimento"). */
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
 }
 
 @layer base {

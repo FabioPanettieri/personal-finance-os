@@ -19,6 +19,9 @@ Apri Docker Desktop e fai doppio clic su **`Avvia Finanze.cmd`**. L'app
 ascolta solo su `127.0.0.1`: non è raggiungibile da Internet. Per usarla dal
 telefono (Tailscale) e installarla come app: [docs/accesso-privato.md](docs/accesso-privato.md).
 
+A ogni avvio Finanze fa da sola un **backup** dei dati (una copia al giorno, le
+ultime 30): [docs/backup.md](docs/backup.md).
+
 ## Avvio in locale
 
 ```bash
@@ -73,6 +76,8 @@ riapplica le migration da zero; `npm run db:stop` ferma lo stack.
 | `npm run test:db:supabase` | Test SQL sul database dello stack locale |
 | `npm run test:integration` | Test di integrazione contro l'API locale |
 | `npm run test:e2e:local` | E2E contro lo stack locale (login e TOTP reali) |
+| `npm run backup` / `npm run restore` | Backup ora / ripristino di un backup (docs/backup.md) |
+| `npm run test:backup` | Prova reale di backup e ripristino sullo stack locale |
 | `npm run check` | Tutti i controlli |
 
 ## Documentazione
@@ -85,6 +90,8 @@ riapplica le migration da zero; `npm run db:stop` ferma lo stack.
 | [03 — Design System](docs/03-design-system.md) | Tipografia, colori, layout, grafici |
 | [04 — Testing](docs/04-testing.md) | Strategia e comandi di test |
 | [05 — Roadmap](docs/05-roadmap.md) | Sprint e report di avanzamento |
+| [Backup](docs/backup.md) | Backup automatico, cifratura, ripristino |
+| [Accesso privato](docs/accesso-privato.md) | PC e telefono via Tailscale, app installabile |
 
 ## Principi non negoziabili
 

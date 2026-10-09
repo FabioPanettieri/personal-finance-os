@@ -5,6 +5,7 @@ import type { Metadata, Viewport } from 'next'
 import { headers } from 'next/headers'
 import type { ReactNode } from 'react'
 
+import { ServiceWorkerRegistration } from '@/components/layout/service-worker'
 import { THEME_INIT_SCRIPT } from '@/lib/theme'
 
 export const metadata: Metadata = {
@@ -36,7 +37,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <ServiceWorkerRegistration />
+      </body>
     </html>
   )
 }

@@ -126,9 +126,20 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) a ogni push.
 
 ## Backup
 
-1. Supabase: backup giornalieri automatici (piano Pro: PITR consigliato).
-2. Export settimanale cifrato: script `scripts/backup.ts` (Sprint 12) che
-   esporta le tabelle dell'utente in JSON, cifrato con `age` verso una chiave
-   pubblica del proprietario, salvato fuori da Supabase.
-3. I CSV originali restano nel bucket privato: la base dati è ricostruibile
+Dettagli e istruzioni: [docs/backup.md](backup.md).
+
+1. Backup locale automatico (Sprint 12, `scripts/backup/`): a ogni avvio di
+   "Avvia Finanze" (prima delle migration) e una volta al giorno con l'avvio
+   automatico. Dati di `public`, `auth` (senza sessioni) e `storage` con
+   `pg_dump --data-only` eseguito nel container, più i file originali degli
+   import. Ultime 30 copie, fuori da Docker e fuori dal repository.
+2. Cifratura facoltativa con `BACKUP_PASSWORD` (AES-256-GCM, chiave scrypt,
+   sale e IV casuali): obbligatoria se la cartella è su un servizio online.
+   Il nome della cartella e `info.json` non contengono dati personali.
+3. Ripristino in un'unica transazione (trigger sospesi con
+   `session_replication_role`), preceduto da un backup di sicurezza; password
+   sbagliata o backup di una versione più recente → nessuna modifica.
+4. L'app legge solo i nomi delle cartelle e `info.json` per mostrare lo stato,
+   mai il contenuto dei backup.
+5. I CSV originali sono anche nel backup: la base dati resta ricostruibile
    reimportandoli (gli import sono idempotenti grazie al fingerprint).

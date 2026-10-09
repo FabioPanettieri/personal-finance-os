@@ -30,7 +30,11 @@ const nextConfig: NextConfig = {
   },
   reactStrictMode: true,
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }]
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      // Il service worker si aggiorna a ogni avvio dell'app, mai da una copia vecchia.
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
+    ]
   },
 }
 

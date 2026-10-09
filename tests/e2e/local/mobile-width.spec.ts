@@ -9,7 +9,7 @@ test.afterAll(async () => {
   await Promise.all(users.map((u) => deleteUser(u)))
 })
 
-const PAGES = ['/', '/transactions', '/accounts', '/business', '/investments', '/reports?kind=year', '/goals', '/rules', '/imports/new', '/settings']
+const PAGES = ['/', '/transactions', '/accounts', '/business', '/investments', '/reports?kind=year', '/goals', '/rules', '/imports/new', '/settings', '/settings/profile', '/settings/backup']
 
 test('mobile: tutte le pagine stanno nello schermo', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'Solo telefono')

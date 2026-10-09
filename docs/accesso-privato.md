@@ -66,6 +66,9 @@ indirizzi) o in Edge (menu … → *App* → *Installa questo sito come app*).
 
 Si apre a schermo intero con l'icona di Finanze. Con il telefono fuori casa
 funziona lo stesso, se Tailscale è attivo sul telefono e il PC è acceso.
+Se il PC è spento (o Finanze non è avviata) l'app mostra la pagina
+"Finanze non è raggiungibile" con cosa controllare, invece di un errore del
+browser. I dati non vengono mai salvati sul telefono.
 
 ## Verifiche
 

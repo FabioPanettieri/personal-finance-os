@@ -9,6 +9,9 @@ echo  Finanze - avvio
 echo  1/3  Database locale (Docker Desktop deve essere aperto)...
 call npx supabase start
 if errorlevel 1 goto errore
+rem Backup dei dati prima di ogni aggiornamento (docs/backup.md). Se non riesce, l'avvio continua.
+echo       Backup dei dati...
+call node scripts\backup\backup.mjs
 rem Aggiornamenti del database (solo le migration nuove, i dati restano).
 call npx supabase migration up --local
 if errorlevel 1 goto errore

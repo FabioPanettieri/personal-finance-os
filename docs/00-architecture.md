@@ -22,7 +22,8 @@ corretta → analytics corrette → UI eccellente**.
 | Quantità titoli | `numeric` DB ↔ `decimal.js` TS | Frazioni di ETF dei PAC |
 | Date | `date` DB ↔ stringa `YYYY-MM-DD` brand `IsoDate` in TS; fuso `Europe/Rome` esplicito | Nessuna conversione implicita UTC |
 | Test | Vitest (unit/integration), suite SQL su Postgres reale (RLS), Playwright (E2E contro build di produzione + finto Supabase Auth) | |
-| PWA | Serwist (`@serwist/next`) | Service worker senza cache dei dati finanziari |
+| PWA | Manifest + service worker scritto a mano (`public/sw.js`, dallo Sprint 12) | Nessuna cache di pagine o dati: solo file statici con hash e la pagina offline |
+| Backup | `scripts/backup/` (pg_dump nel container + tar dei file, cifratura AES-256-GCM facoltativa) | Copia giornaliera fuori da Docker (docs/backup.md) |
 
 Versioni verificate su npm il 03/10/2026: next 16.3, react 19.3, tailwindcss
 4.3, @supabase/ssr 0.12, @supabase/supabase-js 2.117, zod 4.6, vitest 5.0,

@@ -37,7 +37,8 @@ export function Money({
   const [, units, decimals, suffix] = match
 
   return (
-    <span className={cn('tabular', toneClass, className)} aria-label={formatted}>
+    // role="img": l'importo si legge intero ("1.234,56 €") e l'aria-label è ammessa (WCAG, axe aria-prohibited-attr).
+    <span role="img" className={cn('tabular', toneClass, className)} aria-label={formatted}>
       <span aria-hidden>{units}</span>
       <span aria-hidden className="text-[0.6em] font-normal text-fg-muted">
         {decimals}

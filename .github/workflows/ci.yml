@@ -50,6 +50,7 @@ jobs:
           git diff --exit-code -- types/database.ts
       - run: npm run test:db:supabase
       - run: npm run test:integration
+      - run: npm run test:backup
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e:local
       - if: always()

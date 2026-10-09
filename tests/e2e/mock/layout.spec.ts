@@ -12,6 +12,8 @@ const PAGES = [
   { path: '/imports', heading: 'Importazioni' },
   { path: '/imports/new', heading: 'Importa un estratto' },
   { path: '/settings/security', heading: 'Sicurezza' },
+  { path: '/settings/profile', heading: 'Profilo e aspetto' },
+  { path: '/settings/backup', heading: 'Backup' },
   { path: '/investments', heading: 'Investimenti' },
   { path: '/reports', heading: 'Report' },
   { path: '/goals', heading: 'Obiettivi' },

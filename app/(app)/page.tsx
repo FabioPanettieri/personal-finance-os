@@ -1,4 +1,4 @@
-import { ChevronRight, FileText, FileUp } from 'lucide-react'
+import { ChevronRight, DatabaseBackup, FileText, FileUp } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
@@ -13,6 +13,7 @@ import { DEFAULT_TIME_ZONE, today } from '@/lib/dates'
 import { transactionsHref } from '@/lib/transactions/filters'
 import { getProfile, requireUser } from '@/server/auth/session'
 import { loadDashboard } from '@/server/services/dashboard'
+import { readBackupStatus } from '@/server/services/backup-status'
 import { loadGoals } from '@/server/services/goals'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 
@@ -42,6 +43,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const range = { from: period.from, to: period.to }
   const name = profile?.display_name?.trim().split(/\s+/)[0]
   const { main, other } = splitAccounts(d.accounts)
+  const backup = readBackupStatus()
 
   return (
     <>
@@ -95,6 +97,22 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       <div className="mb-6 flex flex-col gap-3 lg:mb-8">
         <ReviewBanner transactions={d.review.transactions} importRows={d.review.importRows} />
+        {d.hasData && backup.kind !== 'ok' ? (
+          <Link
+            href="/settings/backup"
+            data-testid="backup-warning"
+            className="flex min-h-[64px] items-center gap-4 rounded-[var(--radius-card)] border border-warning/40 bg-warning-soft px-5 py-3 transition-colors hover:bg-surface-2"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface text-warning">
+              <DatabaseBackup aria-hidden className="size-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold text-fg">{backup.kind === 'none' ? 'Nessun backup dei tuoi dati' : `Ultimo backup ${backup.days} giorni fa`}</span>
+              <span className="block text-[13px] text-fg-muted">Si fa da solo all’avvio di Finanze sul PC. Tocca per i dettagli.</span>
+            </span>
+            <ChevronRight aria-hidden className="size-5 text-fg-subtle" />
+          </Link>
+        ) : null}
         <Link
           href="/reports"
           data-testid="report-link"

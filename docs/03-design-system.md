@@ -58,6 +58,13 @@ Regole: rosso/verde mai come unico segnale (anche segno `+/−` e icona freccia)
 desaturate (Radix Colors step 9) assegnate dall'utente; grafici con massimo 6
 serie + "Altro". Contrasto testo ≥ 4.5:1 verificato in entrambi i temi.
 
+> **Sprint 12 — contrasto verificato con axe (WCAG 2.1 AA) su tutte le pagine.**
+> Valori corretti in `app/globals.css`: `--fg-subtle` light `#646C7C`, dark
+> `#858C99`; light `--positive` `#177048`, `--negative` `#BF2F37`,
+> `--warning` `#94600F` (≥ 4.5:1 anche sulle superfici `-soft` e `surface-2`).
+> Gli importi con centesimi piccoli (`Money emphasizeUnits`) hanno
+> `role="img"` e l'importo intero come `aria-label`.
+
 ## Spazi, forme, profondità
 
 - Griglia 4 px; padding card 20 (mobile) / 24 (desktop); gap sezioni 32.
@@ -72,6 +79,8 @@ serie + "Altro". Contrasto testo ≥ 4.5:1 verificato in entrambi i temi.
 - Easing `cubic-bezier(.2, .8, .2, 1)`.
 - Numeri hero: count-up una sola volta al primo caricamento, non a ogni filtro.
 - `prefers-reduced-motion`: tutte le animazioni ridotte a dissolvenza istantanea.
+- Ingresso pagina (Sprint 12): `animate-enter`, 260 ms, opacità + 6 px verso l'alto,
+  da `app/(app)/template.tsx` a ogni cambio pagina.
 
 ## Grafici
 

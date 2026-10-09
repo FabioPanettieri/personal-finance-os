@@ -1,4 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 /**
  * E2E contro lo stack Supabase LOCALE reale (Auth, PostgREST, Postgres, RLS).
@@ -6,6 +8,8 @@ import { defineConfig, devices } from '@playwright/test'
  * chiavi locali tramite scripts/with-local-supabase.mjs).
  */
 const APP_PORT = 3101
+/** Cartella dei backup vista dall'app durante i test (i test ci creano backup finti). */
+export const E2E_BACKUP_DIR = join(tmpdir(), 'finanze-e2e-backup')
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.startsWith('http://127.0.0.1')) {
   throw new Error('playwright.local.config.ts gira solo contro lo stack Supabase locale (npm run test:e2e:local).')
@@ -30,7 +34,7 @@ export default defineConfig({
   webServer: {
     command: `npx next build && npx next start -p ${APP_PORT} -H 127.0.0.1`,
     url: `http://127.0.0.1:${APP_PORT}/login`,
-    env: { NEXT_DIST_DIR: '.next-e2e-local', NEXT_TELEMETRY_DISABLED: '1' },
+    env: { NEXT_DIST_DIR: '.next-e2e-local', NEXT_TELEMETRY_DISABLED: '1', BACKUP_DIR: E2E_BACKUP_DIR },
     timeout: 300_000,
     reuseExistingServer: false,
   },
