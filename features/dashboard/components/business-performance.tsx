@@ -22,7 +22,12 @@ export function BusinessCards({ items, currency, range }: { items: BusinessPerfo
         return (
           <li key={b.businessId} data-testid={`business-${b.name}`} className="rounded-[var(--radius-card)] border border-line bg-surface p-5 lg:p-6">
             <div className="flex items-start justify-between gap-3">
-              <h2 className="text-[17px] font-semibold text-fg">{b.name}</h2>
+              <h2 className="text-[17px] font-semibold text-fg">
+                <Link href={`/business/${b.businessId}`} className="inline-flex items-center gap-1 hover:underline">
+                  {b.name}
+                  <ChevronRight aria-hidden className="size-4 text-fg-muted" />
+                </Link>
+              </h2>
               <span className="rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-fg-muted">
                 Margine{' '}
                 <span className="font-semibold text-fg tabular" data-testid="margin">

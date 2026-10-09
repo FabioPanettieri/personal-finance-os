@@ -313,5 +313,27 @@ colpo (test di integrazione, < 5 s sullo stack locale).
 
 **Database**: migration 0009 (2 funzioni, nessuna tabella).
 
+
+## SPRINT 7 — COMPLETED (Business)
+
+**Implemented**
+- Regola unica nel database (migration 0010): un'entrata/spesa/rimborso è
+  business se e solo se ha un business; la natura si allinea da sola
+  (trigger) e i dati esistenti sono stati riallineati.
+- `/business`: "Personale e business" affiancati (entrate, uscite, ti
+  restano / utile) con il totale = somma dei due; card delle attività con link
+  al dettaglio.
+- `/business/[id]`: utile e margine del periodo, grafico incassi/spese degli
+  ultimi 12 mesi (colori validati per daltonismo, dettaglio del mese al tocco,
+  tabella dati), spese per categoria, movimenti del periodo.
+- Funzioni SQL `personal_business_split`, `business_monthly`,
+  `business_category_spending` (SECURITY INVOKER).
+
+**Acceptance**: nessuna doppia conta — test SQL e di integrazione: personale +
+business = entrate e uscite della dashboard; assegnare o togliere un business
+sposta l'importo tra i due gruppi senza cambiare il totale.
+
+**Database**: migration 0010 (1 trigger, 3 funzioni, riallineamento dati).
+
 **Da ricordare all'utente**: backup automatico del database locale (rimandato
 su richiesta).

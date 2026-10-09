@@ -1,11 +1,14 @@
 import type { Metadata } from 'next'
 
 import { SectionTitle } from '@/components/finance/section-title'
+import { SplitOverview } from '@/features/business/components/split-overview'
 import { BusinessCards } from '@/features/dashboard/components/business-performance'
+import { splitTotals } from '@/lib/dashboard/business'
 import { PeriodTabs, SpendingList } from '@/features/dashboard/components/home'
 import { DEFAULT_TIME_ZONE, today } from '@/lib/dates'
 import { transactionsHref } from '@/lib/transactions/filters'
 import { getProfile, requireUser } from '@/server/auth/session'
+import { personalBusinessSplit } from '@/server/repositories/business'
 import { loadDashboard } from '@/server/services/dashboard'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 
@@ -18,8 +21,10 @@ export default async function BusinessPage({ searchParams }: { searchParams: Pro
   const one = (key: string) => (typeof params[key] === 'string' ? (params[key] as string) : null)
   const profile = await getProfile()
   const timeZone = profile?.timezone ?? DEFAULT_TIME_ZONE
-  const d = await loadDashboard(await createSupabaseServerClient(), { period: one('period'), from: one('from'), to: one('to') }, today(timeZone), timeZone)
+  const db = await createSupabaseServerClient()
+  const d = await loadDashboard(db, { period: one('period'), from: one('from'), to: one('to') }, today(timeZone), timeZone)
   const range = { from: d.period.from, to: d.period.to }
+  const split = splitTotals(await personalBusinessSplit(db, range), d.currency)
 
   return (
     <>
@@ -30,6 +35,10 @@ export default async function BusinessPage({ searchParams }: { searchParams: Pro
         </div>
         <PeriodTabs period={d.period} basePath="/business" />
       </header>
+
+      <div className="mb-6 lg:mb-8">
+        <SplitOverview split={split} currency={d.currency} />
+      </div>
 
       <div className="mb-6 lg:mb-8">
         <BusinessCards items={d.businesses} currency={d.currency} range={range} />

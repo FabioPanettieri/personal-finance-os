@@ -283,10 +283,12 @@ select tests.throws(
   format($$insert into public.transactions (account_id, booked_on, description, original_description, amount_cents, type, nature, fingerprint)
            values (%L, '2026-09-01', 'x', 'x', -100, 'transfer', 'personal', tests.fp('c3'))$$, :'a_ing'),
   '23514', 'un trasferimento deve avere natura transfer');
-select tests.throws(
-  format($$insert into public.transactions (account_id, booked_on, description, original_description, amount_cents, type, nature, fingerprint)
-           values (%L, '2026-09-01', 'x', 'x', -100, 'expense', 'transfer', tests.fp('c4'))$$, :'a_ing'),
-  '23514', 'natura transfer ammessa solo per i trasferimenti');
+insert into public.transactions (account_id, booked_on, description, original_description, amount_cents, type, nature, fingerprint)
+values (:'a_ing', '2026-09-01', 'x', 'x', -100, 'expense', 'transfer', tests.fp('c4'));
+select tests.ok(
+  (select nature = 'personal' from public.transactions where fingerprint = tests.fp('c4')),
+  '0010: una spesa con natura transfer viene riportata a personale (natura derivata dal business)');
+delete from public.transactions where fingerprint = tests.fp('c4');
 select tests.throws(
   format($$insert into public.transactions (account_id, booked_on, description, original_description, amount_cents, type, nature, income_source_id, fingerprint)
            values (%L, '2026-09-01', 'x', 'x', -100, 'expense', 'personal', %L, tests.fp('c5'))$$, :'a_ing', :'a_salary'),
@@ -525,6 +527,25 @@ select tests.ok(public.bulk_confirm_transactions(array[:'l1', :'l4', :'l2']::uui
 select tests.throws(
   format('select public.bulk_confirm_transactions(array(select gen_random_uuid() from generate_series(1, 1001)))'),
   '23514', '0009: al massimo 1000 movimenti alla volta');
+
+-- 0010: personale vs business
+select id as a_voxel from public.businesses where slug = 'voxel-studio' \gset
+update public.transactions set business_id = :'a_voxel' where id = :'l1';
+select tests.ok((select nature = 'business' from public.transactions where id = :'l1'), '0010: assegnare un business rende la spesa business');
+update public.transactions set business_id = null where id = :'l1';
+select tests.ok((select nature = 'personal' from public.transactions where id = :'l1'), '0010: togliere il business la riporta personale');
+update public.transactions set business_id = :'a_voxel' where id = :'l4';
+select tests.ok(
+  (select sum(expense_cents) filter (where scope = 'business') = 3000
+      and sum(expense_cents) = (select -sum(amount_cents) from public.transactions where type = 'expense' and booked_on between '2026-09-01' and '2026-09-30')
+   from public.personal_business_split('2026-09-01', '2026-09-30')),
+  '0010: personale + business = totale, nessuna doppia conta');
+select tests.ok(
+  (select revenue_cents = 0 and expense_cents = 3000 and month = '2026-09-01' from public.business_monthly(:'a_voxel', '2026-01-01', '2026-12-31')),
+  '0010: andamento mensile del business');
+select tests.ok(
+  (select expense_cents = 3000 and category_id = :'a_casa' from public.business_category_spending(:'a_voxel', '2026-09-01', '2026-09-30')),
+  '0010: spese del business per categoria');
 delete from public.transactions where id in (:'l1', :'l2', :'l3', :'l4');
 
 reset role;

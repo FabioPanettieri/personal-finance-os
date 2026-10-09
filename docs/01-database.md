@@ -96,6 +96,8 @@ erDiagram
   AAL2) collegano e scollegano in modo atomico.
   Dalla 0009: `bulk_confirm_transactions(ids)` e `bulk_classify_transactions(ids, …)`
   per la modifica di gruppo (max 1000 id, solo i movimenti col segno compatibile).
+- Dalla 0010 la natura di entrate/spese/rimborsi è derivata dal business
+  (`business_id` presente ⇔ `nature = business`, trigger `sync_transaction_nature`).
 
 ### Import
 - **import_profiles** — mapping per banca (encoding, delimitatore, formato data,

@@ -1594,6 +1594,25 @@ export type Database = {
         Returns: number
       }
       bulk_confirm_transactions: { Args: { p_ids: string[] }; Returns: number }
+      business_category_spending: {
+        Args: { p_business: string; p_from: string; p_to: string }
+        Returns: {
+          category_id: string
+          currency: string
+          expense_cents: number
+          tx_count: number
+        }[]
+      }
+      business_monthly: {
+        Args: { p_business: string; p_from: string; p_to: string }
+        Returns: {
+          currency: string
+          expense_cents: number
+          month: string
+          revenue_cents: number
+          tx_count: number
+        }[]
+      }
       category_id_by_path: { Args: { p_path: string; p_user_id: string }; Returns: string }
       dashboard_account_changes: {
         Args: { p_from: string; p_to: string }
@@ -1658,6 +1677,17 @@ export type Database = {
           currency: string
           day: string
           total_cents: number
+        }[]
+      }
+      personal_business_split: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          currency: string
+          expense_cents: number
+          income_cents: number
+          refund_cents: number
+          scope: string
+          tx_count: number
         }[]
       }
       seed_default_data: { Args: { p_user_id: string }; Returns: undefined }
