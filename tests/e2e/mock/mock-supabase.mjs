@@ -201,7 +201,7 @@ const server = createServer(async (req, res) => {
 
     // Dati finanziari: utente senza dati (stato vuoto). Conti, movimenti e
     // dashboard reali si testano in tests/e2e/local contro Supabase locale.
-    const EMPTY_TABLES = ['accounts', 'account_balances', 'imports', 'import_rows', 'transactions', 'transaction_categories', 'businesses', 'income_sources', 'investment_transactions']
+    const EMPTY_TABLES = ['accounts', 'account_balances', 'imports', 'import_rows', 'transactions', 'transaction_categories', 'businesses', 'income_sources', 'investment_transactions', 'goals', 'investment_valuations', 'investment_plans', 'instruments']
     if ((req.method === 'GET' || req.method === 'HEAD') && EMPTY_TABLES.some((t) => path === `/rest/v1/${t}`)) {
       if (!claims) return send(res, 401, { message: 'JWT required' })
       if (req.method === 'HEAD') {

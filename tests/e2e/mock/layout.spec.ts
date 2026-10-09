@@ -12,6 +12,9 @@ const PAGES = [
   { path: '/imports', heading: 'Importazioni' },
   { path: '/imports/new', heading: 'Importa un estratto' },
   { path: '/settings/security', heading: 'Sicurezza' },
+  { path: '/investments', heading: 'Investimenti' },
+  { path: '/reports', heading: 'Report' },
+  { path: '/goals', heading: 'Obiettivi' },
 ]
 
 test.beforeEach(async ({ page, request }) => {

@@ -61,7 +61,7 @@ export function AppShell({ user, children }: { user: UserSummary; children: Reac
         </div>
       </header>
 
-      <main id="main" className="pb-32 lg:pb-14 lg:pl-[248px]">
+      <main id="main" className="overflow-x-clip pb-32 lg:pb-14 lg:pl-[248px]">
         <div className="mx-auto w-full max-w-[1200px] px-4 pt-4 sm:px-6 lg:px-12 lg:pt-10">{children}</div>
       </main>
 

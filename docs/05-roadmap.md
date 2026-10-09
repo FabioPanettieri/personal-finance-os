@@ -379,5 +379,22 @@ integrazione (stessi numeri della Home; somma dei mesi = totale dell'anno).
 
 **Database**: nessuna migration (aggregati SQL esistenti).
 
+
+## SPRINT 10 — COMPLETED (Obiettivi)
+
+**Implemented**
+- `/goals` (dalla card "Obiettivi" in Home; resta evidenziata la Home):
+  crea, modifica, archivia, ripristina, elimina.
+- Progresso a mano ("Aggiungi" / "Togli", mai sotto zero) oppure dai saldi
+  dei conti, con una quota per conto (es. 50% del conto deposito); i saldi
+  negativi non contano.
+- Scadenza: mesi rimasti e quanto mettere da parte al mese; stato raggiunto /
+  in corso / scaduto; totale mensile di tutti gli obiettivi.
+- Home: card con i primi tre obiettivi.
+- Correzione mobile: Obiettivi, Conti e il carosello della Home non allargano più la
+  pagina sul telefono (nuovo test su tutte le pagine principali).
+
+**Database**: nessuna migration (tabelle `goals` e `goal_accounts` dallo Sprint 0).
+
 **Da ricordare all'utente**: backup automatico del database locale (rimandato
 su richiesta).

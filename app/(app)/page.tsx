@@ -6,12 +6,14 @@ import { AccountRow, BankCard } from '@/components/finance/bank-card'
 import { SectionTitle } from '@/components/finance/section-title'
 import { TransactionRow } from '@/components/finance/transaction-row'
 import { Money } from '@/components/ui/money'
+import { GoalSummary } from '@/features/goals/components/goal-card'
 import { MonthSummary, NetWorthHero, PeriodTabs, ReviewBanner, SpendingList } from '@/features/dashboard/components/home'
 import { splitAccounts } from '@/features/accounts/split'
 import { DEFAULT_TIME_ZONE, today } from '@/lib/dates'
 import { transactionsHref } from '@/lib/transactions/filters'
 import { getProfile, requireUser } from '@/server/auth/session'
 import { loadDashboard } from '@/server/services/dashboard'
+import { loadGoals } from '@/server/services/goals'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 
 export const metadata: Metadata = { title: 'Home' }
@@ -34,7 +36,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const profile = await getProfile()
   const timeZone = profile?.timezone ?? DEFAULT_TIME_ZONE
   const now = today(timeZone)
-  const d = await loadDashboard(await createSupabaseServerClient(), { period: one('period'), from: one('from'), to: one('to') }, now, timeZone)
+  const db = await createSupabaseServerClient()
+  const [d, goals] = await Promise.all([loadDashboard(db, { period: one('period'), from: one('from'), to: one('to') }, now, timeZone), loadGoals(db, now)])
   const { period, currency } = d
   const range = { from: period.from, to: period.to }
   const name = profile?.display_name?.trim().split(/\s+/)[0]
@@ -145,6 +148,27 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             ))}
           </div>
         ) : null}
+      </section>
+
+      <section aria-labelledby="goals-title" data-testid="home-goals" className="mb-6 rounded-[var(--radius-card)] border border-line bg-surface p-5 lg:mb-8 lg:p-6">
+        <SectionTitle id="goals-title" href="/goals" linkLabel={goals.length > 0 ? 'Tutti' : 'Crea'}>
+          Obiettivi
+        </SectionTitle>
+        {goals.length > 0 ? (
+          <ul aria-label="Obiettivi in corso" className="grid gap-5 lg:grid-cols-3">
+            {goals.slice(0, 3).map((g) => (
+              <li key={g.id}>
+                <Link href="/goals" className="block rounded-[14px] hover:opacity-90">
+                  <GoalSummary goal={g} compact />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Link href="/goals" className="block py-2 text-[14px] text-fg-muted hover:text-fg">
+            Nessun obiettivo: crea il primo (fondo emergenze, vacanza, un acquisto…) e segui quanto manca.
+          </Link>
+        )}
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">

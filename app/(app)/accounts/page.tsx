@@ -24,7 +24,7 @@ function activity(account: Account): string {
 function AccountGrid({ accounts, label }: { accounts: Account[]; label: string }) {
   const { main, other } = splitAccounts(accounts.map((a) => ({ ...a, isActive: true })))
   return (
-    <ul aria-label={label} className="grid gap-3 sm:grid-cols-6 lg:gap-4">
+    <ul aria-label={label} className="grid grid-cols-1 gap-3 sm:grid-cols-6 lg:gap-4">
       {main.map((a) => (
         <li key={a.id} className="sm:col-span-2">
           <BankCard account={{ ...a, typeLabel: a.type.label }} footer={activity(a)} />
