@@ -60,6 +60,9 @@ describe('script delle decisioni', () => {
     expect(sql).toContain("'expense', 'personal'")
     expect(() => ruleSql({ testo: 'ab', tipo: 'spesa' }, 0)).toThrow(/almeno 3/)
     expect(() => ruleSql({ testo: 'abc', tipo: 'boh' }, 0)).toThrow(/tipo/)
+    const inName = ruleSql({ testo: 'mario', tipo: 'rimborso', categoria: 'Svago > Uscite' }, 0).match(/Tua: [^']+/)![0]
+    const outName = ruleSql({ testo: 'mario', tipo: 'spesa', categoria: 'Svago > Uscite' }, 0).match(/Tua: [^']+/)![0]
+    expect(inName).not.toBe(outName)
     expect(limitSql({ conto: 'Carta di credito', importo: 2000 }, 0)).toContain('credit_limit_cents = 200000')
   })
 })

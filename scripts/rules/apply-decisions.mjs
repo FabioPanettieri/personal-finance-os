@@ -39,7 +39,7 @@ export function ruleSql(rule, index) {
     : 'null'
   const business = rule.business ? `(select b.id from public.businesses b where b.user_id = u.id and (b.slug = ${q(rule.business)} or b.name = ${q(rule.business)}))` : 'null'
   const source = type === 'income' && rule.fonte ? `(select s.id from public.income_sources s where s.user_id = u.id and s.name = ${q(rule.fonte)})` : 'null'
-  const name = `Tua: “${text}” → ${rule.categoria ?? type}`.slice(0, 80)
+  const name = `Tua: “${text}”${direction === 'any' ? '' : direction === 'in' ? ' (entrate)' : ' (uscite)'} → ${rule.categoria ?? type}`.slice(0, 80)
   return `
 do $$
 declare v_cat uuid; v_bus uuid; v_src uuid; u record;
