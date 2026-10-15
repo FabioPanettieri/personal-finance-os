@@ -2,8 +2,12 @@
 rem Avvia Finanze sul PC: database locale + app su 127.0.0.1:3000 (mai esposta su Internet).
 rem Dal telefono: tramite Tailscale, vedi docs/accesso-privato.md.
 cd /d "%~dp0"
-netstat -ano | findstr /R /C:"127.0.0.1:3000 .*LISTENING" >nul
-if not errorlevel 1 goto giaacceso
+rem Se Finanze e' gia' acceso (avvio automatico o finestra precedente) lo spegne:
+rem dopo un aggiornamento deve ripartire con la versione nuova, non con quella vecchia.
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr /R /C:"127.0.0.1:3000 .*LISTENING"') do (
+  echo  Finanze era gia' acceso: lo riavvio con la versione di questa cartella...
+  taskkill /PID %%p /T /F >nul 2>&1
+)
 echo.
 echo  Finanze - avvio
 echo  1/3  Database locale (Docker Desktop deve essere aperto)...
@@ -27,13 +31,6 @@ echo  3/3  Pronta. Apri http://127.0.0.1:3000 (oppure il tuo indirizzo .ts.net).
 echo       Per spegnere: chiudi questa finestra.
 echo.
 call npm run start
-goto fine
-:giaacceso
-echo.
-echo  Finanze e' gia' acceso (avvio automatico): apri http://127.0.0.1:3000
-echo  Dopo un aggiornamento: spegnilo con scripts\windows\disattiva-avvio-automatico.ps1,
-echo  riapri questo file e poi riattiva l'avvio automatico.
-pause
 goto fine
 :errore
 echo.

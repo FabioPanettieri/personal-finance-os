@@ -36,7 +36,14 @@ node scripts\backup\backup.mjs --daily
 npx.cmd supabase migration up --local
 if (-not (Test-Path '.env.local')) { npm.cmd run env:local }
 if (-not (Test-Path 'node_modules')) { npm.cmd ci }
-# La build si rifà solo se manca (dopo un aggiornamento la fa "Avvia Finanze").
-if (-not (Test-Path '.next\BUILD_ID')) { npm.cmd run build }
+# Build rifatta se manca o se il codice e' piu' nuovo (cartella aggiornata dallo ZIP).
+$needsBuild = -not (Test-Path '.next\BUILD_ID')
+if (-not $needsBuild) {
+  $built = (Get-Item '.next\BUILD_ID').LastWriteTime
+  $newest = Get-ChildItem -Recurse -File -Path app, features, lib, components, server -Include *.ts, *.tsx, *.css -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if ($newest -and $newest.LastWriteTime -gt $built) { $needsBuild = $true }
+}
+if ($needsBuild) { npm.cmd run build }
 npm.cmd run start
 Stop-Transcript | Out-Null
