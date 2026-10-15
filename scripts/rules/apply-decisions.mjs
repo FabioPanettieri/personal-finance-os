@@ -4,7 +4,8 @@
 //   { "regole": [ { "testo": "mangopay", "dove": "controparte", "verso": "entrate",
 //                   "tipo": "income", "categoria": "Vendite", "business": "voxel-studio",
 //                   "fonte": "VOXEL Studio" } ],
-//     "plafond": [ { "conto": "Carta di credito", "importo": 2000 } ] }
+//     "plafond": [ { "conto": "Carta di credito", "importo": 2000 } ],
+//     "conti": [ { "conto": "ING Conto Risparmio", "iban": "IT…", "saldo": 1234.56 } ] }
 // Ogni regola diventa una regola "tua" in /rules (affidabilità 95%, si applica da sola).
 // Poi in Finanze: Movimenti → Regole → "Applica ai movimenti da sistemare".
 import { existsSync, readFileSync } from 'node:fs'
@@ -62,6 +63,36 @@ export function limitSql(entry, index) {
   return `update public.accounts set credit_limit_cents = ${Math.round(amount * 100)} where name = ${q(entry.conto)};`
 }
 
+/** Conto: IBAN (riconosce i giroconti) e saldo reale di oggi (ricalcola il saldo iniziale). */
+export function accountSql(entry, index) {
+  const where = `conto ${index + 1}`
+  if (!entry.conto) throw new Error(`${where}: serve "conto" (il nome in Finanze)`)
+  const iban = entry.iban ? String(entry.iban).replace(/\s+/g, '').toUpperCase() : null
+  if (iban && !/^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/.test(iban)) throw new Error(`${where}: IBAN non valido`)
+  const saldo = entry.saldo === undefined ? null : Number(entry.saldo)
+  if (saldo !== null && !Number.isFinite(saldo)) throw new Error(`${where}: "saldo" deve essere un numero (es. 1234.56)`)
+  const cents = saldo === null ? null : Math.round(saldo * 100)
+  // Con "data" (AAAA-MM-GG) il saldo vale a fine giornata: si contano solo i movimenti dal giorno dopo.
+  // È il modo sicuro per i conti senza estratto (es. conto deposito): un giroconto importato dopo non si conta due volte.
+  const data = entry.data ?? null
+  if (data !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(data) || saldo === null)) throw new Error(`${where}: "data" va nel formato AAAA-MM-GG e insieme a "saldo"`)
+  return `
+do $$
+declare n integer;
+begin
+  update public.accounts a set
+    iban = coalesce(${q(iban)}, a.iban),
+    initial_balance_cents = case
+      when ${data !== null} then ${cents ?? 0}
+      when ${cents !== null} then ${cents ?? 0} - coalesce((select b.balance_cents - a.initial_balance_cents from public.account_balances b where b.account_id = a.id), 0)
+      else a.initial_balance_cents end,
+    initial_balance_on = case when ${data !== null} then ${data ? `date ${q(data)} + 1` : 'null'} else a.initial_balance_on end
+  where a.name = ${q(entry.conto)};
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception '${where}: conto % non trovato', ${q(entry.conto)}; end if;
+end $$;`
+}
+
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('apply-decisions.mjs')) {
   const file = process.argv[2]
   if (!file || !existsSync(file)) {
@@ -72,10 +103,10 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
     const data = JSON.parse(readFileSync(file, 'utf8'))
     const users = await psql(containers(resolve(import.meta.dirname, '..', '..')).db, 'select count(distinct user_id) from public.accounts')
     if (users !== '1') throw new Error(`nel database ci sono ${users} utenti con conti: lo script funziona solo con un utente`)
-    const statements = [...(data.regole ?? []).map(ruleSql), ...(data.plafond ?? []).map(limitSql)]
+    const statements = [...(data.regole ?? []).map(ruleSql), ...(data.plafond ?? []).map(limitSql), ...(data.conti ?? []).map(accountSql)]
     const { db } = containers(resolve(import.meta.dirname, '..', '..'))
     await psql(db, `begin; ${statements.join('\n')} commit;`)
-    console.log(`✓ ${data.regole?.length ?? 0} regole salvate${data.plafond?.length ? `, plafond aggiornato` : ''}.`)
+    console.log(`✓ ${data.regole?.length ?? 0} regole salvate${data.plafond?.length ? ', plafond aggiornato' : ''}${data.conti?.length ? `, ${data.conti.length} conti aggiornati` : ''}.`)
     console.log('  Ora in Finanze: Movimenti → Regole → "Applica ai movimenti da sistemare".')
   } catch (error) {
     console.error(`✗ ${error instanceof Error ? error.message : error}`)

@@ -9,6 +9,9 @@ import { Money } from '@/components/ui/money'
 import { GoalSummary } from '@/features/goals/components/goal-card'
 import { MonthSummary, NetWorthHero, PeriodTabs, ReviewBanner, SpendingList } from '@/features/dashboard/components/home'
 import { splitAccounts } from '@/features/accounts/split'
+import { ImportReminderBanner } from '@/features/imports/components/import-reminder'
+import { importReminders } from '@/lib/imports/reminder'
+import { reminderAccounts } from '@/server/repositories/import-reminder'
 import { DEFAULT_TIME_ZONE, today } from '@/lib/dates'
 import { transactionsHref } from '@/lib/transactions/filters'
 import { getProfile, requireUser } from '@/server/auth/session'
@@ -44,6 +47,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const name = profile?.display_name?.trim().split(/\s+/)[0]
   const { main, other } = splitAccounts(d.accounts)
   const backup = readBackupStatus()
+  const reminders = importReminders(await reminderAccounts(db, timeZone), now)
 
   return (
     <>
@@ -57,6 +61,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
         <PeriodTabs period={period} />
       </header>
+
+      {d.hasData ? <ImportReminderBanner reminders={reminders} /> : null}
 
       {!d.hasData ? (
         <Link

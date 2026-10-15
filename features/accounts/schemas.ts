@@ -45,6 +45,19 @@ export const accountUpdateSchema = z.object({
     }
     return parsed.value
   }),
+  // Saldo reale di oggi (quello dell'app della banca): se c'è, ricalcola il saldo iniziale.
+  actualBalance: z
+    .string()
+    .optional()
+    .transform((value, ctx): Cents | null => {
+      if (!value || value.trim() === '') return null
+      const parsed = parseAmountInput(value)
+      if (!parsed.ok) {
+        ctx.addIssue({ code: 'custom', message: parsed.error })
+        return z.NEVER
+      }
+      return parsed.value
+    }),
   // Plafond mensile della carta: vuoto = nessuno.
   creditLimit: z
     .string()

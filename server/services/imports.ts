@@ -1,5 +1,5 @@
 import { addDays, DEFAULT_TIME_ZONE, isIsoDate, type IsoDate } from '@/lib/dates'
-import { AUTO_APPLY_CONFIDENCE, deriveNature, REVIEW_BELOW_CONFIDENCE, signAllows } from '@/lib/categorization/engine'
+import { AUTO_APPLY_CONFIDENCE, classify, deriveNature, REVIEW_BELOW_CONFIDENCE, signAllows } from '@/lib/categorization/engine'
 import { mirrorFingerprint, secondaryFingerprint } from '@/lib/imports/fingerprint'
 import { applyRulesToPending } from '@/server/repositories/rules'
 import { positiveDecimal } from '@/lib/csv/values'
@@ -317,10 +317,6 @@ export async function commitImport(db: DbClient, importId: string, timeZone = DE
 
   const rows = await loadAllRows(db, importId)
   const included = rows.filter((r) => r.status === 'new')
-  const pending = included.filter((r) => rowNeedsReview(r))
-  if (pending.length > 0) {
-    return { ok: false, errors: [`${pending.length} righe da verificare: classificale o escludile prima di confermare`] }
-  }
   if (included.length === 0) return { ok: false, errors: ['Nessuna riga da importare'] }
 
   // Ricostruzione deterministica dalla riga originale (raw) + correzioni dell'utente.
@@ -331,6 +327,42 @@ export async function commitImport(db: DbClient, importId: string, timeZone = DE
     const outcome = importer.normalizeRow(row.raw as Record<string, string>, row.row_index, mapping.mapping, context)
     if (outcome.kind !== 'ok') return { ok: false, errors: [`Riga ${row.row_index + 1} non più valida`] }
     planned.push({ row, tx: outcome.transaction })
+  }
+
+  // Righe ancora da verificare: non bloccano più la conferma. Prima si riprova con le
+  // regole di adesso (anche quelle create dopo l'anteprima); se nessuna basta, il
+  // movimento entra "da sistemare" (uscita o entrata secondo il segno, non confermato)
+  // e si sistema da Movimenti, anche in blocco.
+  const pendingRows = planned.filter((p) => rowNeedsReview(p.row))
+  if (pendingRows.length > 0) {
+    const classification = await loadClassificationData(db)
+    for (const p of pendingRows) {
+      const c = classify({ ...p.tx, accountId: account.id }, classification.rules, classification.lookups)
+      if (c.type && signAllows(c.type, p.tx.amount) && c.confidence >= REVIEW_BELOW_CONFIDENCE) {
+        Object.assign(p.row, {
+          proposed_type: c.type,
+          proposed_nature: c.nature ?? deriveNature(c.type, c.businessId),
+          proposed_category_id: c.categoryId,
+          proposed_business_id: c.type === 'transfer' || c.type === 'investment' ? null : c.businessId,
+          proposed_income_source_id: c.type === 'income' ? c.incomeSourceId : null,
+          categorization_method: 'rule',
+          categorization_confidence: c.confidence,
+          categorization_rule_id: c.ruleDbId,
+        })
+      } else {
+        const type: TransactionType = p.tx.amount < 0 ? 'expense' : 'income'
+        Object.assign(p.row, {
+          proposed_type: type,
+          proposed_nature: 'personal',
+          proposed_category_id: null,
+          proposed_business_id: null,
+          proposed_income_source_id: null,
+          categorization_method: 'rule',
+          categorization_confidence: 0,
+          categorization_rule_id: null,
+        })
+      }
+    }
   }
 
   // Già presenti (doppio invio o tentativo precedente interrotto): si collegano, non si duplicano.

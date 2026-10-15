@@ -506,3 +506,20 @@ per scelta, E2E con mock 24.
 **Tests**: SQL 177, unit 339, integrazione 121, E2E locali 48 + 4 saltati,
 E2E con mock 24, backup reale 1. axe senza violazioni anche sul dettaglio
 conto e business.
+
+### Correzioni dall'uso reale (15 ottobre)
+- **Import confermabili anche con righe da verificare**: era il blocco che
+  teneva fuori dai conti centinaia di movimenti (Revolut a zero, uscite e
+  "Dove vanno i soldi" vuoti, business fermi). Alla conferma le righe dubbie
+  vengono riclassificate con le regole di quel momento; le altre entrano "da
+  sistemare" (entrata/uscita secondo il segno) e si sistemano da Movimenti.
+- Barra di conferma dell'import sopra la navigazione anche su iPhone (safe area).
+- Sigla della banca (ING, R, TR) su ogni movimento.
+- **Promemoria settimanale** in Home e in Importa: per ogni conto con estratti
+  CSV non aggiornato da 7 giorni, il periodo da scaricare (dal giorno dopo
+  l'ultimo movimento a oggi).
+- **Saldo reale** nelle impostazioni del conto (ricalcola il saldo iniziale);
+  in `npm run decisioni` anche `conti` (IBAN, saldo, data del saldo).
+- `npm run da-sistemare`: elenco raggruppato di cosa resta da sistemare
+  (import non confermati, movimenti da sistemare, business "Altro"), con IBAN e
+  numeri lunghi mascherati, per preparare `decisioni.json`.

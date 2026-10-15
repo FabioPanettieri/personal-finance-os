@@ -1,6 +1,7 @@
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, LineChart, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 
+import { BankMark } from '@/components/finance/bank-mark'
 import { Money } from '@/components/ui/money'
 import { accountColor } from '@/lib/banks'
 import { formatIsoDate, type IsoDate } from '@/lib/dates'
@@ -38,12 +39,19 @@ export function TransactionRow({ tx, showDate = false, link = true }: { tx: Tran
   const detail = internal ? (tx.type === 'transfer' ? 'Tra i tuoi conti' : 'Investimento') : (tx.businessName ?? tx.categoryName)
   return (
     <Wrapper tx={tx} link={link}>
-      <span
-        aria-hidden
-        className="grid size-10 shrink-0 place-items-center rounded-full"
-        style={{ background: `color-mix(in oklab, ${color} 20%, transparent)`, color }}
-      >
-        <Icon className="size-[18px]" strokeWidth={2.25} />
+      <span className="relative shrink-0">
+        <span
+          aria-hidden
+          className="grid size-10 place-items-center rounded-full"
+          style={{ background: `color-mix(in oklab, ${color} 20%, transparent)`, color }}
+        >
+          <Icon className="size-[18px]" strokeWidth={2.25} />
+        </span>
+        {/* Sigla della banca che ha eseguito il movimento. */}
+        <BankMark
+          account={{ institution: tx.accountInstitution, name: tx.accountName }}
+          className="absolute -right-1.5 -bottom-1 h-[18px] min-w-[18px] px-1 text-[8px]"
+        />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[15px] font-medium text-fg">{tx.description}</span>

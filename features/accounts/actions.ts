@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 
 import { fieldErrorsFrom, type FormState } from '@/features/auth/schemas'
 import { requireUser } from '@/server/auth/session'
-import { setAccountActive, updateAccount } from '@/server/repositories/accounts'
+import { initialBalanceFor } from '@/lib/accounts'
+import { getAccount, setAccountActive, updateAccount } from '@/server/repositories/accounts'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 
 import { accountIdSchema, accountUpdateSchema } from './schemas'
@@ -12,7 +13,7 @@ import { accountIdSchema, accountUpdateSchema } from './schemas'
 export type AccountFormState = FormState & {
   savedAt?: number
   /** Valori inviati, restituiti in caso d'errore: React 19 azzera il form dopo l'action. */
-  values?: Record<'name' | 'institution' | 'iban' | 'color' | 'initialBalance' | 'initialBalanceOn', string> & { creditLimit?: string }
+  values?: Record<'name' | 'institution' | 'iban' | 'color' | 'initialBalance' | 'initialBalanceOn', string> & { creditLimit?: string; actualBalance?: string }
 }
 
 function submittedValues(formData: FormData): NonNullable<AccountFormState['values']> {
@@ -29,6 +30,7 @@ function submittedValues(formData: FormData): NonNullable<AccountFormState['valu
     initialBalanceOn: text('initialBalanceOn'),
     // Il campo esiste solo nel form delle carte: assente = non toccare il valore salvato.
     ...(formData.has('creditLimit') ? { creditLimit: text('creditLimit') } : {}),
+    actualBalance: text('actualBalance'),
   }
 }
 
@@ -50,7 +52,15 @@ export async function updateAccountAction(
   const parsed = accountUpdateSchema.safeParse(values)
   if (!parsed.success) return { status: 'error', fieldErrors: fieldErrorsFrom(parsed.error), values }
 
-  const result = await updateAccount(await createSupabaseServerClient(), accountId, parsed.data)
+  const db = await createSupabaseServerClient()
+  const input = { ...parsed.data }
+  if (parsed.data.actualBalance !== null) {
+    // Saldo reale: il saldo iniziale diventa "reale − movimenti già contati".
+    const current = await getAccount(db, accountId)
+    if (!current) return { status: 'error', message: 'Conto non trovato.', values }
+    input.initialBalance = initialBalanceFor(parsed.data.actualBalance, current.balance, current.initialBalance)
+  }
+  const result = await updateAccount(db, accountId, input)
   if (!result.ok) {
     if (result.reason === 'duplicate_name') return { status: 'error', fieldErrors: { name: 'Esiste già un conto con questo nome' }, values }
     if (result.reason === 'duplicate_iban') return { status: 'error', fieldErrors: { iban: 'IBAN già associato a un altro conto' }, values }

@@ -137,13 +137,6 @@ describe('Revolut: trasferimento da ING, commissioni, righe da verificare', () =
     expect(detail.rows.filter((r) => r.status === 'skipped')).toHaveLength(5)
   })
 
-  it('la conferma è bloccata finché restano righe da verificare', async () => {
-    expect(await commitImport(a.client, importId)).toEqual({
-      ok: false,
-      errors: ['1 righe da verificare: classificale o escludile prima di confermare'],
-    })
-  })
-
   it('l’utente corregge: ATM → spesa; poi conferma', async () => {
     const detail = (await getImportDetail(a.client, importId))!
     const atm = detail.rows.find((r) => r.description === 'Cash at Example ATM')!
@@ -271,5 +264,22 @@ describe('Sicurezza: AAL2, RLS e isolamento', () => {
   it('B non può importare sul conto di A', async () => {
     const result = await createImportPreview(b.client, { userId: b.id, accountId: ing, source: 'ing', file: file('ing/fixture-utente.csv') })
     expect(result).toEqual({ ok: false, errors: ['Conto non trovato'] })
+  })
+})
+
+describe('conferma con righe ancora da verificare', () => {
+  it('non è bloccata: riprova con le regole di adesso, il resto entra "da sistemare"', async () => {
+    const rev = await accountId(b.client, 'Revolut')
+    const importId = await preview(b, rev, 'revolut', file('revolut/completo.csv'))
+    const before = (await getImportDetail(b.client, importId))!
+    expect(before.rows.filter((r) => r.needsReview).length).toBeGreaterThan(0)
+
+    // Regola creata DOPO l'anteprima: alla conferma vale già.
+    await b.client.from('categorization_rules').insert({ name: 'Prova ATM', origin: 'user', priority: 5, match_field: 'description', match_type: 'contains', pattern: 'example atm', direction: 'out', set_type: 'expense', set_nature: 'personal', confidence: 0.95 })
+
+    const result = await commitImport(b.client, importId)
+    expect(result.ok).toBe(true)
+    const atm = await b.client.from('transactions').select('type, is_categorized, categorization_method').eq('description', 'Cash at Example ATM').single()
+    expect(atm.data).toEqual({ type: 'expense', is_categorized: true, categorization_method: 'rule' })
   })
 })

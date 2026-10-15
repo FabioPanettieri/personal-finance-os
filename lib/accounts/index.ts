@@ -209,3 +209,11 @@ export function monthlyAccountFlows(movements: readonly AccountMovement[], today
     count: e.count,
   }))
 }
+
+/**
+ * Saldo iniziale che fa tornare il saldo calcolato uguale a quello reale (app della banca):
+ * reale − (saldo calcolato − saldo iniziale attuale), cioè reale meno i movimenti già contati.
+ */
+export function initialBalanceFor(actual: Cents, computedBalance: Cents, currentInitial: Cents): Cents {
+  return (actual - (computedBalance - currentInitial)) as Cents
+}

@@ -87,6 +87,15 @@ export function AccountEditForm({
           hint="Formato 1.234,56 — il saldo all’inizio della data indicata."
           error={errors?.initialBalance}
         />
+        <Field
+          label={`Saldo reale oggi (${values.currency}, facoltativo)`}
+          name="actualBalance"
+          defaultValue=""
+          inputMode="decimal"
+          autoComplete="off"
+          hint="Quello che vedi nell’app della banca, dopo aver importato gli estratti fino a oggi: l’app corregge da sola il saldo iniziale."
+          error={errors?.actualBalance}
+        />
         {values.creditLimit !== undefined ? (
           <Field
             label={`Plafond mensile (${values.currency})`}

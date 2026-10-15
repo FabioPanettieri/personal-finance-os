@@ -42,8 +42,9 @@ test('ING: anteprima, righe da verificare, correzione, esclusione, conferma e re
   expect(before).toBe(0)
 
   const commit = page.getByRole('button', { name: 'Conferma importazione' })
-  await expect(commit).toBeDisabled()
-  await expect(page.getByText('2 righe da verificare: classificale o escludile.')).toBeVisible()
+  // Le righe da verificare non bloccano: la barra lo dice, il pulsante resta attivo.
+  await expect(commit).toBeEnabled()
+  await expect(page.getByTestId('commit-bar')).toContainText('2 sono da verificare')
   await page.screenshot({ path: `tests/e2e/screenshots/local-import-preview-${testInfo.project.name}.png`, fullPage: true })
 
   await page.getByRole('link', { name: /Da verificare/ }).click()
@@ -85,7 +86,7 @@ test('file della banca sbagliata: errore chiaro, nessuna importazione', async ({
   users.push(user)
   await signInWithMfa(page, user, '/imports/new')
 
-  await page.getByText('Revolut', { exact: true }).click()
+  await page.locator('form').getByText('Revolut', { exact: true }).click()
   await page.getByLabel('File CSV').setInputFiles(fixture('trade-republic/fixture-utente.csv'))
   await page.getByRole('button', { name: /Analizza e mostra l’anteprima/ }).click()
   await expect(page.getByRole('main').getByRole('alert')).toContainText('Il file sembra un export Trade Republic, non Revolut')
@@ -98,7 +99,7 @@ test('Trade Republic: acquisto ETF come operazione su titoli, versamento come ca
   users.push(user)
   await signInWithMfa(page, user, '/imports/new')
 
-  await page.getByText('Trade Republic', { exact: true }).click()
+  await page.locator('form').getByText('Trade Republic', { exact: true }).click()
   await page.getByLabel('File CSV').setInputFiles(fixture('trade-republic/fixture-utente.csv'))
   await page.getByRole('button', { name: /Analizza e mostra l’anteprima/ }).click()
   await expect(page.getByRole('listitem').filter({ hasText: 'Core MSCI World' })).toContainText('Operazione titoli')
@@ -141,4 +142,36 @@ test('ING formato reale: NUL in coda, saldi informativi, trasferimenti verso con
     { amount_cents: -40000, type: 'expense' },
     { amount_cents: 40000, type: 'transfer' },
   ])
+})
+
+test('righe da verificare confermabili; su telefono la barra di conferma sta sopra la navigazione; poi promemoria in Home', async ({ page, isMobile }) => {
+  const user = await createUser('import-pending')
+  users.push(user)
+  await signInWithMfa(page, user, '/imports/new')
+
+  await page.getByLabel('File CSV').setInputFiles(fixture('ing/completo.csv'))
+  await page.getByRole('button', { name: /Analizza e mostra l’anteprima/ }).click()
+  await expect(page).toHaveURL(/\/imports\/[0-9a-f-]{36}$/)
+
+  const bar = page.getByTestId('commit-bar')
+  await bar.scrollIntoViewIfNeeded()
+  if (isMobile) {
+    await page.evaluate(() => window.scrollTo(0, 0))
+    const barBox = (await bar.boundingBox())!
+    const navBox = (await page.locator('nav[aria-label="Navigazione principale"]').last().locator('ul').boundingBox())!
+    expect(barBox.y + barBox.height, 'la barra non deve finire sotto la navigazione').toBeLessThanOrEqual(navBox.y)
+  }
+  await bar.getByRole('button', { name: 'Conferma importazione' }).click()
+  await expect(page.getByRole('region', { name: 'Riepilogo' })).toContainText('Importate')
+
+  // Le 2 righe dubbie sono entrate "da sistemare", non perse.
+  const { count } = await admin.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_categorized', false)
+  expect(count).toBeGreaterThan(0)
+
+  // Promemoria: ING appena importato, Revolut e Trade Republic mai → da caricare.
+  await page.goto('/')
+  const reminder = page.getByTestId('import-reminder')
+  await expect(reminder).toContainText('Revolut')
+  await expect(reminder).toContainText('Trade Republic')
+  await expect(reminder).not.toContainText('ING Direct')
 })

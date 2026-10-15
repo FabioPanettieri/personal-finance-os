@@ -3,7 +3,11 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { NewImportForm } from '@/features/imports/components/new-import-form'
-import { requireUser } from '@/server/auth/session'
+import { ImportReminderBanner } from '@/features/imports/components/import-reminder'
+import { DEFAULT_TIME_ZONE, today } from '@/lib/dates'
+import { importReminders } from '@/lib/imports/reminder'
+import { getProfile, requireUser } from '@/server/auth/session'
+import { reminderAccounts } from '@/server/repositories/import-reminder'
 import { createSupabaseServerClient } from '@/server/supabase/server'
 
 export const metadata: Metadata = { title: 'Importa' }
@@ -17,6 +21,8 @@ export default async function NewImportPage() {
     .eq('is_active', true)
     .order('sort_order')
   if (error) throw new Error('Lettura conti non riuscita')
+  const timeZone = (await getProfile())?.timezone ?? DEFAULT_TIME_ZONE
+  const reminders = importReminders(await reminderAccounts(db, timeZone), today(timeZone))
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -33,6 +39,7 @@ export default async function NewImportPage() {
           Storico
         </Link>
       </header>
+      <ImportReminderBanner reminders={reminders} showAction={false} />
       <NewImportForm accounts={data.map((a) => ({ id: a.id, name: a.name, currency: a.currency, bankProfile: a.default_bank_profile }))} />
     </div>
   )
