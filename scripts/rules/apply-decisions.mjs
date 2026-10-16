@@ -1,6 +1,7 @@
 // Applica le TUE decisioni di classificazione al database locale, senza farle a mano una per una:
 //   npm run decisioni -- C:\percorso\decisioni.json
 // Il file (fuori dal repository: contiene nomi di negozi e persone) elenca regole come
+// Con "forza": true la regola corregge anche i movimenti classificati a mano.
 //   { "regole": [ { "testo": "mangopay", "dove": "controparte", "verso": "entrate",
 //                   "tipo": "income", "categoria": "Vendite", "business": "voxel-studio",
 //                   "fonte": "VOXEL Studio" } ],
@@ -33,8 +34,11 @@ export function ruleSql(rule, index) {
   const nature = type === 'transfer' ? 'transfer' : type === 'investment' ? 'investment' : rule.business ? 'business' : 'personal'
   // Categoria "Padre > Figlia" oppure solo "Padre".
   const [parent, child] = String(rule.categoria ?? '').split('>').map((s) => s.trim())
+  // "Carta di credito" nasce solo al primo addebito sulla carta: la crea la funzione della migration 0012.
   const category = parent
-    ? child
+    ? !child && parent === 'Carta di credito'
+      ? 'public.card_spending_category(u.id)'
+      : child
       ? `(select c.id from public.transaction_categories c join public.transaction_categories p on p.id = c.parent_id where c.user_id = u.id and p.name = ${q(parent)} and c.name = ${q(child)})`
       : `(select c.id from public.transaction_categories c where c.user_id = u.id and c.parent_id is null and c.name = ${q(parent)})`
     : 'null'
@@ -55,18 +59,17 @@ begin
   values (u.id, ${q(name)}, 'user', 10, '${field}', 'contains', ${q(text)}, '${direction}',
     '${type}', '${nature}', v_cat, v_bus, v_src, 0.95)
   returning id into v_rule;
-  ${
-    type === 'income' || type === 'expense' || type === 'refund'
-      ? `-- Anche i movimenti già classificati da una regola automatica (mai quelli corretti a mano).
+  -- Riclassifica anche i movimenti già importati: quelli da regole automatiche sempre,
+  -- quelli corretti a mano solo con "forza": true. Mai le metà di un giroconto già collegato.
   update public.transactions t set
-    type = '${type}', category_id = v_cat, business_id = v_bus, income_source_id = ${type === 'income' ? 'v_src' : 'null'},
+    type = '${type}', nature = '${nature}', category_id = v_cat,
+    business_id = ${type === 'transfer' || type === 'investment' ? 'null' : 'v_bus'},
+    income_source_id = ${type === 'income' ? 'v_src' : 'null'},
     is_categorized = true, categorization_method = 'rule', categorization_confidence = 0.95, categorization_rule_id = v_rule
-  where t.user_id = u.id and t.categorization_method <> 'manual' and t.transfer_group_id is null
-    and ${type === 'expense' ? 't.amount_cents < 0' : 't.amount_cents > 0'}
+  where t.user_id = u.id ${rule.forza ? '' : "and t.categorization_method <> 'manual'"} and t.transfer_group_id is null
+    and ${type === 'expense' ? 't.amount_cents < 0' : type === 'income' || type === 'refund' ? 't.amount_cents > 0' : 'true'}
     and ${direction === 'in' ? 't.amount_cents > 0' : direction === 'out' ? 't.amount_cents < 0' : 'true'}
-    and lower(coalesce(t.${field === 'counterparty' ? 'counterparty' : 'description'}, '')) like ${q(`%${text.replaceAll('%', '').replaceAll('_', '')}%`)};`
-      : ''
-  }
+    and lower(coalesce(t.${field === 'counterparty' ? 'counterparty' : 'description'}, '')) like ${q(`%${text.replaceAll('%', '').replaceAll('_', '')}%`)};
 end $$;`
 }
 

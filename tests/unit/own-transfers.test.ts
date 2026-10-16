@@ -65,4 +65,15 @@ describe('script delle decisioni', () => {
     expect(inName).not.toBe(outName)
     expect(limitSql({ conto: 'Carta di credito', importo: 2000 }, 0)).toContain('credit_limit_cents = 200000')
   })
+
+  it('riclassifica giroconti e, con "forza", anche i movimenti corretti a mano', () => {
+    const transfer: string = ruleSql({ testo: 'ricarica di', tipo: 'giroconto', categoria: 'Trasferimenti > Giroconto' }, 0)
+    expect(transfer).toContain("type = 'transfer', nature = 'transfer'")
+    expect(transfer).toContain('business_id = null')
+    expect(transfer).toContain("categorization_method <> 'manual'")
+    const forced: string = ruleSql({ testo: 'mangopay', tipo: 'entrata', categoria: 'Vendite', forza: true }, 0)
+    expect(forced).not.toContain("categorization_method <> 'manual'")
+    expect(forced).toContain('transfer_group_id is null')
+    expect(ruleSql({ testo: 'estratto conto', tipo: 'spesa', categoria: 'Carta di credito' }, 0)).toContain('card_spending_category(u.id)')
+  })
 })

@@ -16,7 +16,12 @@ export function dockerExec(container, args, { input, interactive = false } = {})
       if (code === 0) resolve(Buffer.concat(out))
       else reject(new Error(`${args[0]} nel container ${container} è terminato con codice ${code}: ${Buffer.concat(err).toString().trim()}`))
     })
-    if (interactive) child.stdin.end(input ?? Buffer.alloc(0))
+    if (interactive) {
+      // Se il comando esce prima di aver letto tutto (es. psql che si ferma al primo errore),
+      // la scrittura fallisce con EPIPE: l'errore vero arriva comunque da "close".
+      child.stdin.on('error', () => {})
+      child.stdin.end(input ?? Buffer.alloc(0))
+    }
   })
 }
 

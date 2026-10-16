@@ -535,3 +535,9 @@ conto e business.
 - `npm run decisioni`: le regole di spesa/entrata riclassificano anche i
   movimenti già classificati da regole automatiche (mai quelli corretti a mano);
   SQL passato da input standard (molte regole).
+- `npm run decisioni`, seconda passata: riclassifica tutti i tipi (anche
+  giroconto e investimento, che tolgono business e fonte), mai le metà di un
+  giroconto già collegato; con `"forza": true` corregge anche i movimenti
+  classificati a mano (es. business "Altro" sbagliato); la categoria "Carta di
+  credito" si crea se manca; un errore SQL ora mostra il messaggio di psql
+  invece di "EPIPE".
