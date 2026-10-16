@@ -5,7 +5,7 @@ import { cents } from '@/lib/money'
 import { maskIban, nameKey, ownNamePattern, personWords, recurringIbans } from '@/lib/transfers/own-transfers'
 
 // @ts-expect-error -- modulo .mjs senza tipi
-import { limitSql, ruleSql } from '../../scripts/rules/apply-decisions.mjs'
+import { limitSql, replaceSql, ruleSql } from '../../scripts/rules/apply-decisions.mjs'
 
 describe('giroconti: nome dell’intestatario', () => {
   it('riconosce solo nomi di persona (2–4 parole)', () => {
@@ -75,5 +75,6 @@ describe('script delle decisioni', () => {
     expect(forced).not.toContain("categorization_method <> 'manual'")
     expect(forced).toContain('transfer_group_id is null')
     expect(ruleSql({ testo: 'estratto conto', tipo: 'spesa', categoria: 'Carta di credito' }, 0)).toContain('card_spending_category(u.id)')
+    expect(replaceSql()).toContain("name like 'Tua:%'")
   })
 })

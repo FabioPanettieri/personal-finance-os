@@ -540,4 +540,5 @@ conto e business.
   giroconto già collegato; con `"forza": true` corregge anche i movimenti
   classificati a mano (es. business "Altro" sbagliato); la categoria "Carta di
   credito" si crea se manca; un errore SQL ora mostra il messaggio di psql
-  invece di "EPIPE".
+  invece di "EPIPE"; il file è l'elenco completo: le regole "Tua:" di un file
+  precedente vengono sostituite.

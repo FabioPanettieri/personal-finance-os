@@ -2,6 +2,7 @@
 //   npm run decisioni -- C:\percorso\decisioni.json
 // Il file (fuori dal repository: contiene nomi di negozi e persone) elenca regole come
 // Con "forza": true la regola corregge anche i movimenti classificati a mano.
+// Il file è sempre l'elenco completo: le regole di un file precedente vengono sostituite.
 //   { "regole": [ { "testo": "mangopay", "dove": "controparte", "verso": "entrate",
 //                   "tipo": "income", "categoria": "Vendite", "business": "voxel-studio",
 //                   "fonte": "VOXEL Studio" } ],
@@ -73,6 +74,12 @@ begin
 end $$;`
 }
 
+/** Toglie le regole create da un file decisioni precedente: il nuovo file le sostituisce tutte. */
+export function replaceSql() {
+  return `delete from public.categorization_rules where origin = 'user' and name like 'Tua:%'
+  and user_id = (select user_id from public.accounts group by user_id order by count(*) desc limit 1);`
+}
+
 export function limitSql(entry, index) {
   const amount = Number(entry.importo)
   if (!entry.conto || !Number.isFinite(amount) || amount <= 0) throw new Error(`plafond ${index + 1}: servono "conto" e "importo" > 0`)
@@ -119,7 +126,10 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
     const data = JSON.parse(readFileSync(file, 'utf8'))
     const users = await psql(containers(resolve(import.meta.dirname, '..', '..')).db, 'select count(distinct user_id) from public.accounts')
     if (users !== '1') throw new Error(`nel database ci sono ${users} utenti con conti: lo script funziona solo con un utente`)
-    const statements = [...(data.regole ?? []).map(ruleSql), ...(data.plafond ?? []).map(limitSql), ...(data.conti ?? []).map(accountSql)]
+    // Il file è l'elenco completo: le regole "Tua:" di un file precedente si tolgono
+    // (i movimenti restano come sono finché una regola nuova non li riclassifica).
+    const reset = data.regole?.length ? [replaceSql()] : []
+    const statements = [...reset, ...(data.regole ?? []).map(ruleSql), ...(data.plafond ?? []).map(limitSql), ...(data.conti ?? []).map(accountSql)]
     const { db } = containers(resolve(import.meta.dirname, '..', '..'))
     // Dall'input standard: con molte regole il testo supera il limite di lunghezza degli argomenti.
     await dockerExec(db, ['psql', '-U', 'supabase_admin', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-q'], {
