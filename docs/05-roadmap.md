@@ -523,3 +523,15 @@ conto e business.
 - `npm run da-sistemare`: elenco raggruppato di cosa resta da sistemare
   (import non confermati, movimenti da sistemare, business "Altro"), con IBAN e
   numeri lunghi mascherati, per preparare `decisioni.json`.
+
+### VOXEL e Revolut (16 ottobre)
+- Pagina di ogni business: **"Dall'inizio"** con investito (tutte le spese),
+  incassato, guadagno netto o quanto resta da recuperare, spesa media al mese e
+  barra "investimento recuperato".
+- **Saldo Revolut allineato da solo**: alla conferma di ogni import Revolut il
+  saldo del conto diventa quello dichiarato dalla banca nell'ultima riga del
+  file (ultima riga del giorno riconosciuta dai saldi, non dall'ordine). ING
+  resta escluso: il suo saldo nel CSV non è affidabile per questo uso.
+- `npm run decisioni`: le regole di spesa/entrata riclassificano anche i
+  movimenti già classificati da regole automatiche (mai quelli corretti a mano);
+  SQL passato da input standard (molte regole).

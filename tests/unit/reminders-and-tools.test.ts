@@ -1,6 +1,7 @@
 import { initialBalanceFor } from '@/lib/accounts'
 import { toIsoDate } from '@/lib/dates'
 import { importReminders } from '@/lib/imports/reminder'
+import { endOfDayBalance } from '@/lib/imports/reported-balance'
 import { cents } from '@/lib/money'
 
 // @ts-expect-error -- moduli .mjs senza tipi
@@ -62,5 +63,20 @@ describe('elenco da sistemare', () => {
     const text: string = report([row('Bar Centrale 1', -150), row('Bar Centrale 2', -250), row('Amazon', -999)])
     expect(text).toContain('3 movimenti, 2 gruppi')
     expect(text.split('\n')[2]).toMatch(/^1\. import \| Revolut \| uscite \| bar centrale — 2 mov\./)
+  })
+})
+
+describe('saldo dichiarato dalla banca', () => {
+  const r = (bookedOn: string, amount: number, reportedBalance: number | null) => ({ bookedOn: toIsoDate(bookedOn), amount, reportedBalance })
+
+  it('prende il saldo dell’ultima riga dell’ultimo giorno, in qualunque ordine siano le righe', () => {
+    const rows = [r('2026-10-01', -100, 900), r('2026-10-02', -50, 850), r('2026-10-02', 200, 1050), r('2026-10-02', -30, 1020)]
+    expect(endOfDayBalance(rows)).toEqual({ date: '2026-10-02', balance: 1020 })
+    expect(endOfDayBalance([...rows].reverse())).toEqual({ date: '2026-10-02', balance: 1020 })
+  })
+
+  it('senza saldi o con un caso ambiguo non tocca nulla', () => {
+    expect(endOfDayBalance([r('2026-10-01', -100, null)])).toBeNull()
+    expect(endOfDayBalance([r('2026-10-02', 10, 100), r('2026-10-02', -10, 90), r('2026-10-02', 10, 100)])).toBeNull()
   })
 })

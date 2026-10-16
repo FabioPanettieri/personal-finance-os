@@ -201,6 +201,9 @@ describe('Revolut formato reale dopo ING', () => {
     // ING 400 + Revolut + Carta 400 + Risparmio 0 + TR 100: la somma è entrate − spese.
     const { data } = await admin.from('transactions').select('amount_cents, type').eq('user_id', a.id)
     const net = data!.filter((t) => t.type === 'income' || t.type === 'expense' || t.type === 'refund').reduce((s, t) => s + t.amount_cents, 0)
-    expect(Object.values(all).reduce((s, v) => s + v, 0)).toBe(net)
+    // Revolut dichiara il saldo riga per riga: il conto parte dai 4,85 € che c'erano prima della prima riga.
+    const { data: rev } = await admin.from('accounts').select('initial_balance_cents').eq('id', revolut).single()
+    expect(rev!.initial_balance_cents).toBe(485)
+    expect(Object.values(all).reduce((s, v) => s + v, 0)).toBe(net + 485)
   })
 })

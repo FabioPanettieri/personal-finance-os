@@ -1,6 +1,7 @@
 import { addDays, DEFAULT_TIME_ZONE, isIsoDate, type IsoDate } from '@/lib/dates'
 import { AUTO_APPLY_CONFIDENCE, classify, deriveNature, REVIEW_BELOW_CONFIDENCE, signAllows } from '@/lib/categorization/engine'
 import { mirrorFingerprint, secondaryFingerprint } from '@/lib/imports/fingerprint'
+import { endOfDayBalance, type ReportedRow } from '@/lib/imports/reported-balance'
 import { applyRulesToPending } from '@/server/repositories/rules'
 import { positiveDecimal } from '@/lib/csv/values'
 import { IMPORTERS } from '@/lib/imports/importers'
@@ -624,7 +625,18 @@ export async function commitImport(db: DbClient, importId: string, timeZone = DE
     .eq('status', 'preview')
   if (finalError) fail('Chiusura importazione', finalError)
 
-  // Giroconti imparati (nome dell'intestatario, IBAN ricorrenti) e regole sui movimenti
+  // Saldo dichiarato dalla banca riga per riga (solo Revolut, affidabile): il saldo del conto diventa quello vero.
+  const reported: ReportedRow[] = []
+  for (const row of source === 'revolut' ? rows : []) {
+    if (row.status !== 'new' && row.status !== 'duplicate') continue
+    const outcome = importer.normalizeRow(row.raw as Record<string, string>, row.row_index, mapping.mapping, context)
+    if (outcome.kind !== 'ok' || outcome.transaction.movement !== 'cash') continue
+    const t = outcome.transaction
+    reported.push({ bookedOn: t.bookedOn, amount: t.amount + t.secondary.reduce((sum, p) => sum + p.amount, 0), reportedBalance: t.reportedBalance })
+  }
+  await alignToReportedBalance(db, account.id, endOfDayBalance(reported))
+
+    // Giroconti imparati (nome dell'intestatario, IBAN ricorrenti) e regole sui movimenti
   // ancora da sistemare, anche di import precedenti. Un errore qui non annulla l'import.
   try {
     await applyRulesToPending(db)
@@ -636,6 +648,25 @@ export async function commitImport(db: DbClient, importId: string, timeZone = DE
     ok: true,
     value: { imported: included.length, transactions: cashInserts.length, investmentTransactions },
   }
+}
+
+/** Saldo iniziale = saldo della banca a fine giornata − movimenti già contati fino a quel giorno. */
+async function alignToReportedBalance(db: DbClient, accountId: string, end: { date: IsoDate; balance: number } | null) {
+  if (!end) return
+  const { data: acc, error } = await db.from('accounts').select('initial_balance_on').eq('id', accountId).single()
+  if (error) fail('Lettura conto', error)
+  if (acc.initial_balance_on && acc.initial_balance_on > end.date) return
+  let sum = 0
+  for (let from = 0; ; from += 1000) {
+    let query = db.from('transactions').select('amount_cents').eq('account_id', accountId).lte('booked_on', end.date)
+    if (acc.initial_balance_on) query = query.gte('booked_on', acc.initial_balance_on)
+    const { data, error: e } = await query.order('id').range(from, from + 999)
+    if (e) fail('Somma movimenti', e)
+    sum += data.reduce((s, t) => s + Number(t.amount_cents), 0)
+    if (data.length < 1000) break
+  }
+  const { error: e } = await db.from('accounts').update({ initial_balance_cents: end.balance - sum }).eq('id', accountId)
+  if (e) fail('Allineamento saldo', e)
 }
 
 function assetClass(value: string | null): string {

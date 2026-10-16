@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { containers } from '../backup/lib.mjs'
-import { psql } from '../backup/docker.mjs'
+import { dockerExec, psql } from '../backup/docker.mjs'
 
 const TYPES = { income: 'income', entrata: 'income', expense: 'expense', spesa: 'expense', transfer: 'transfer', giroconto: 'transfer', investment: 'investment', investimento: 'investment', refund: 'refund', rimborso: 'refund' }
 const FIELDS = { descrizione: 'description', description: 'description', controparte: 'counterparty', counterparty: 'counterparty' }
@@ -43,7 +43,7 @@ export function ruleSql(rule, index) {
   const name = `Tua: “${text}”${direction === 'any' ? '' : direction === 'in' ? ' (entrate)' : ' (uscite)'} → ${rule.categoria ?? type}`.slice(0, 80)
   return `
 do $$
-declare v_cat uuid; v_bus uuid; v_src uuid; u record;
+declare v_cat uuid; v_bus uuid; v_src uuid; v_rule uuid; u record;
 begin
   select id into u from auth.users where id = (select user_id from public.accounts group by user_id order by count(*) desc limit 1);
   select ${category}, ${business}, ${source} into v_cat, v_bus, v_src;
@@ -53,7 +53,20 @@ begin
   insert into public.categorization_rules (user_id, name, origin, priority, match_field, match_type, pattern, direction,
     set_type, set_nature, set_category_id, set_business_id, set_income_source_id, confidence)
   values (u.id, ${q(name)}, 'user', 10, '${field}', 'contains', ${q(text)}, '${direction}',
-    '${type}', '${nature}', v_cat, v_bus, v_src, 0.95);
+    '${type}', '${nature}', v_cat, v_bus, v_src, 0.95)
+  returning id into v_rule;
+  ${
+    type === 'income' || type === 'expense' || type === 'refund'
+      ? `-- Anche i movimenti già classificati da una regola automatica (mai quelli corretti a mano).
+  update public.transactions t set
+    type = '${type}', category_id = v_cat, business_id = v_bus, income_source_id = ${type === 'income' ? 'v_src' : 'null'},
+    is_categorized = true, categorization_method = 'rule', categorization_confidence = 0.95, categorization_rule_id = v_rule
+  where t.user_id = u.id and t.categorization_method <> 'manual' and t.transfer_group_id is null
+    and ${type === 'expense' ? 't.amount_cents < 0' : 't.amount_cents > 0'}
+    and ${direction === 'in' ? 't.amount_cents > 0' : direction === 'out' ? 't.amount_cents < 0' : 'true'}
+    and lower(coalesce(t.${field === 'counterparty' ? 'counterparty' : 'description'}, '')) like ${q(`%${text.replaceAll('%', '').replaceAll('_', '')}%`)};`
+      : ''
+  }
 end $$;`
 }
 
@@ -105,7 +118,11 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
     if (users !== '1') throw new Error(`nel database ci sono ${users} utenti con conti: lo script funziona solo con un utente`)
     const statements = [...(data.regole ?? []).map(ruleSql), ...(data.plafond ?? []).map(limitSql), ...(data.conti ?? []).map(accountSql)]
     const { db } = containers(resolve(import.meta.dirname, '..', '..'))
-    await psql(db, `begin; ${statements.join('\n')} commit;`)
+    // Dall'input standard: con molte regole il testo supera il limite di lunghezza degli argomenti.
+    await dockerExec(db, ['psql', '-U', 'supabase_admin', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-q'], {
+      input: Buffer.from(`begin;\n${statements.join('\n')}\ncommit;\n`),
+      interactive: true,
+    })
     console.log(`✓ ${data.regole?.length ?? 0} regole salvate${data.plafond?.length ? ', plafond aggiornato' : ''}${data.conti?.length ? `, ${data.conti.length} conti aggiornati` : ''}.`)
     console.log('  Ora in Finanze: Movimenti → Regole → "Applica ai movimenti da sistemare".')
   } catch (error) {

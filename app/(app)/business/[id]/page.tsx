@@ -12,7 +12,7 @@ import { PeriodTabs, SpendingList } from '@/features/dashboard/components/home'
 import { businessMonths } from '@/lib/dashboard/business'
 import { BASE_CURRENCY, businessMargin, spendingByCategory } from '@/lib/dashboard/metrics'
 import { addMonths, monthsInRange, resolvePeriod } from '@/lib/dashboard/period'
-import { DEFAULT_TIME_ZONE, isIsoDate, today } from '@/lib/dates'
+import { DEFAULT_TIME_ZONE, formatIsoDate, isIsoDate, today } from '@/lib/dates'
 import { cents, formatPercent } from '@/lib/money'
 import { parseTransactionFilters, transactionsHref } from '@/lib/transactions/filters'
 import { cn } from '@/lib/utils/cn'
@@ -50,13 +50,20 @@ export default async function BusinessDetailPage({
   const trend = { from: monthsInRange({ from: addMonths(now, -11), to: now })[0]!, to: now }
   const currency = BASE_CURRENCY
 
-  const [periodRows, trendRows, categoryRows, tree, recent] = await Promise.all([
+  const sinceStart = { from: firstDate ?? now, to: now }
+  const [periodRows, trendRows, categoryRows, tree, recent, allRows] = await Promise.all([
     businessMonthly(db, id, range),
     businessMonthly(db, id, trend),
     businessCategorySpending(db, id, range),
     categoryTree(db),
     listTransactions(db, parseTransactionFilters({ business: id, from: range.from, to: range.to }), null),
+    businessMonthly(db, id, sinceStart),
   ])
+  const sum = (rows: typeof allRows, key: 'revenueCents' | 'expenseCents') => cents(rows.filter((r) => r.currency === currency).reduce((s, r) => s + r[key], 0))
+  const invested = sum(allRows, 'expenseCents')
+  const earned = sum(allRows, 'revenueCents')
+  const recovered = invested > 0 ? earned / invested : null
+  const months = Math.max(1, monthsInRange(sinceStart).length)
   const revenue = cents(periodRows.filter((r) => r.currency === currency).reduce((s, r) => s + r.revenueCents, 0))
   const expenses = cents(periodRows.filter((r) => r.currency === currency).reduce((s, r) => s + r.expenseCents, 0))
   const profit = cents(revenue - expenses)
@@ -106,6 +113,40 @@ export default async function BusinessDetailPage({
           </Link>
         </div>
       </section>
+
+      {firstDate ? (
+        <section aria-labelledby="since-title" data-testid="business-since-start" className="mb-6 rounded-[var(--radius-card)] border border-line bg-surface p-5 lg:mb-8 lg:p-6">
+          <SectionTitle id="since-title">Dall’inizio ({formatIsoDate(firstDate)})</SectionTitle>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[14px] bg-surface-2 p-3">
+              <p className="text-[13px] text-fg-muted">Investito (tutte le spese)</p>
+              <Money value={invested} currency={currency} className="block text-[20px] font-bold text-fg" />
+              <p className="text-[12px] text-fg-muted">
+                in media <Money value={cents(Math.round(invested / months))} currency={currency} /> al mese
+              </p>
+            </div>
+            <div className="rounded-[14px] bg-surface-2 p-3">
+              <p className="text-[13px] text-fg-muted">Incassato</p>
+              <Money value={earned} currency={currency} className="block text-[20px] font-bold text-positive" />
+            </div>
+            <div className="rounded-[14px] bg-surface-2 p-3">
+              <p className="text-[13px] text-fg-muted">{earned >= invested ? 'Guadagno netto' : 'Ancora da recuperare'}</p>
+              <Money value={cents(Math.abs(earned - invested))} currency={currency} className={cn('block text-[20px] font-bold', earned >= invested ? 'text-positive' : 'text-fg')} />
+            </div>
+          </div>
+          {recovered !== null ? (
+            <div className="mt-4">
+              <div className="flex justify-between text-[13px] text-fg-muted">
+                <span>Investimento recuperato</span>
+                <span className="font-semibold text-fg">{Math.round(recovered * 100)}%</span>
+              </div>
+              <div className="mt-1 h-3 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`Investimento recuperato al ${Math.round(recovered * 100)}%`}>
+                <div className="h-full rounded-full bg-positive" style={{ width: `${Math.min(1, recovered) * 100}%` }} />
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section aria-labelledby="trend-title" className="mb-6 rounded-[var(--radius-card)] border border-line bg-surface p-5 lg:mb-8 lg:p-6">
         <SectionTitle id="trend-title">Ultimi 12 mesi</SectionTitle>
